@@ -39,7 +39,7 @@ GitHub リポジトリには **1つだけ** シークレットを登録します
 
 `main` ブランチへのプッシュで、ビルド → SSH デプロイが自動実行されます。デプロイに必要な SSH 情報はすべて 1Password から取得されます。
 
-**Discord 通知（CI / デプロイ）:** CI 結果とデプロイ結果を Discord に通知します。設定手順・フォーマットの詳細は [apps/.github/README.md](../.github/README.md)（Discord 通知設定）を参照してください。
+**CI / デプロイ通知:** 現状は Discord。**Signaly へ移行予定** — [設計ガイド](https://github.com/m-guchi/docs/blob/main/README.md#ci--デプロイ通知) 参照。
 
 - **CI:** `develop` への push は失敗時のみ、`main` 向け PR は成功・失敗・キャンセルを通知
 - **デプロイ / リリース:** `main` への push 後に結果を通知
@@ -142,3 +142,12 @@ git push origin develop
 | `npm run release:minor` | マイナー版リリース準備 |
 | `npm run release:major` | メジャー版リリース準備 |
 | `npm run icons` | `assets/icon.svg` から favicon / PWA アイコンを生成 |
+
+## CI/CD の既知の課題
+
+> 2026-06-29 時点で確認された課題です。対応が完了したら削除または更新してください。
+
+| 優先度 | 課題 | 対象ファイル |
+|--------|------|-------------|
+| 中 | Discord 通知を Signaly へ移行する（`discord-notify.sh` → `signaly-notify.sh`、`DISCORD_CI_WEBHOOK_URL` → `SIGNALY_WEBHOOK_URL`） | `.github/workflows/deploy.yml` |
+| 中 | **`notify-release` にバージョン番号が出ない** — `needs` に `tag` がなく `NOTIFY_VERSION` も未設定のため Signaly 通知にバージョンが表示されない。`needs: [tag, deploy, release]` + `NOTIFY_VERSION: ${{ needs.tag.outputs.tag }}` を追加する | `.github/workflows/deploy.yml` |

@@ -1,5 +1,5 @@
 /** package.json の version が正。npm version / npm run release:* で自動同期される */
-export const APP_VERSION = '1.4.4';
+export const APP_VERSION = '1.4.5';
 
 /**
  * アプリ内「更新履歴」に表示するデータ。
@@ -13,6 +13,13 @@ export const APP_VERSION = '1.4.4';
  * - `npm version` / `npm run build` で追加されたプレースホルダーは、リリース前に必ず置き換える
  */
 export const CHANGELOG = [
+  {
+    version: '1.4.5',
+    date: '2026-07-13',
+    changes: [
+      'PC・タブレット幅でカードが縦長に歪んで表示される不具合を修正',
+    ],
+  },
   {
     version: '1.4.4',
     date: '2026-06-25',

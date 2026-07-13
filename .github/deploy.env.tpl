@@ -9,4 +9,4 @@ SSH_USERNAME=op://apps/Server/username
 SSH_PORT=op://apps/Server/ssh-port
 DEPLOY_PATH=op://apps/solitaire/DEPLOY_PATH
 SSH_PRIVATE_KEY=op://apps/githubaction-sshkey/PRIVATE_KEY
-DISCORD_CI_WEBHOOK_URL=op://apps/discord_webhook/CI_URL
+SIGNALY_WEBHOOK_URL=op://apps/solitaire/ci-webhook-url

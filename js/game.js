@@ -492,14 +492,10 @@ function fitLayout() {
   const isDesktop = viewportWidth >= 480;
   const cols = 7;
 
-  const appStyle = getComputedStyle(document.getElementById('app'));
   const boardStyle = getComputedStyle(board);
-  const horizontalInset =
-    parseFloat(appStyle.paddingLeft) +
-    parseFloat(appStyle.paddingRight) +
-    parseFloat(boardStyle.paddingLeft) +
-    parseFloat(boardStyle.paddingRight);
-  const boardWidth = Math.max(0, viewportWidth - horizontalInset);
+  const boardHorizontalPadding =
+    parseFloat(boardStyle.paddingLeft) + parseFloat(boardStyle.paddingRight);
+  const boardWidth = Math.max(0, board.getBoundingClientRect().width - boardHorizontalPadding);
   const gap = isDesktop
     ? Math.min(8, Math.max(4, boardWidth * 0.012))
     : Math.min(4, Math.max(2, boardWidth * 0.008));
