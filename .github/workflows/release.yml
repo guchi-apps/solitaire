@@ -52,10 +52,11 @@ jobs:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
           OP_ENV_FILE: .github/deploy.env.tpl
 
-      - name: Notify Discord
+      - name: Signaly に通知
         env:
-          DISCORD_WEBHOOK_URL: ${{ env.DISCORD_CI_WEBHOOK_URL }}
+          SIGNALY_WEBHOOK_URL: ${{ env.SIGNALY_WEBHOOK_URL }}
           NOTIFY_STATUS: ${{ needs.release.result }}
           NOTIFY_APP: Solitaire
           NOTIFY_KIND: リリース
-        run: bash .github/scripts/discord-notify.sh
+          NOTIFY_VERSION: ${{ github.ref_name }}
+        run: bash .github/scripts/signaly-notify.sh
