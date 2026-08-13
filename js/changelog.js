@@ -1,5 +1,5 @@
 /** package.json の version が正。npm version / npm run release:* で自動同期される */
-export const APP_VERSION = '1.4.5';
+export const APP_VERSION = '1.4.6';
 
 /**
  * アプリ内「更新履歴」に表示するデータ。
@@ -13,6 +13,13 @@ export const APP_VERSION = '1.4.5';
  * - `npm version` / `npm run build` で追加されたプレースホルダーは、リリース前に必ず置き換える
  */
 export const CHANGELOG = [
+  {
+    version: '1.4.6',
+    date: '2026-08-13',
+    changes: [
+      '内部構造を変更しました',
+    ],
+  },
   {
     version: '1.4.5',
     date: '2026-07-13',
