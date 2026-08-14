@@ -7,6 +7,25 @@ const root = path.join(__dirname, '..');
 const pkgPath = path.join(root, 'package.json');
 const changelogPath = path.join(root, 'js', 'changelog.js');
 
+const PLACEHOLDER = '（更新内容を記入してください）';
+
+// リリース自動化ワークフロー（release-develop-to-main.yml）は、developへ取り込まれた
+// 差分から利用者向けの更新履歴を生成し、環境変数 RELEASE_CHANGELOG で渡してくる。
+// 生成される文面は箇条書き・段落のどちらもありうるため、行単位に分解し、
+// 箇条書き記号と番号を落として1行1項目にそろえる。
+function parseReleaseChangelog(raw) {
+  return (raw ?? '')
+    .split('\n')
+    .map((line) => line.trim().replace(/^(?:[-*・]|\d+[.)])\s*/, '').trim())
+    .filter((line) => line !== '');
+}
+
+// changes は生成された文面をそのまま埋め込むため、JavaScriptの文字列リテラルを
+// 壊さないようにエスケープする。
+function escapeForJs(value) {
+  return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
 const version = pkg.version;
 
@@ -31,18 +50,24 @@ if (!topVersionMatch) {
   process.exit(1);
 }
 
+let insertedChanges = 0;
 const topVersion = topVersionMatch[1];
 if (topVersion !== version) {
   const today = new Date().toISOString().slice(0, 10);
+  const changes = parseReleaseChangelog(process.env.RELEASE_CHANGELOG);
+  const items = changes.length > 0 ? changes : [PLACEHOLDER];
   // 先頭に新エントリのみ追記する。過去バージョンのエントリは変更しない（js/changelog.js の記載ルール参照）。
+  // RELEASE_CHANGELOG が未設定・空のとき（ローカルで npm version / npm run build を
+  // 実行した場合）は、従来どおり手で埋めるための枠だけを作る。
   const newEntry = `  {
     version: '${version}',
     date: '${today}',
     changes: [
-      '（更新内容を記入してください）',
+${items.map((item) => `      '${escapeForJs(item)}',`).join('\n')}
     ],
   },
 `;
+  insertedChanges = changes.length;
   content = content.replace(
     /export const CHANGELOG = \[\n/,
     `export const CHANGELOG = [\n${newEntry}`,
@@ -79,4 +104,8 @@ indexContent = indexContent.replace(
 );
 fs.writeFileSync(indexPath, indexContent, 'utf8');
 
-console.log(`Synced version ${version} to js/changelog.js`);
+console.log(
+  insertedChanges > 0
+    ? `Synced version ${version} to js/changelog.js (${insertedChanges} change(s) from RELEASE_CHANGELOG)`
+    : `Synced version ${version} to js/changelog.js`,
+);
