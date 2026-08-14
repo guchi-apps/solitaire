@@ -22,7 +22,7 @@
       write('<link rel="icon" href="' + assetUrl('assets/favicon-32.png?v=6') + '" type="image/png" sizes="32x32">');
       write('<link rel="apple-touch-icon" href="' + assetUrl('assets/apple-touch-icon.png?v=6') + '">');
       write('<link rel="manifest" href="' + assetUrl('manifest.webmanifest') + '">');
-      write('<link rel="stylesheet" href="' + assetUrl('styles.css?v=1.4.7') + '">');
+      write('<link rel="stylesheet" href="' + assetUrl('styles.css?v=1.5.0') + '">');
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register(assetUrl('sw.js'), { scope: basePath }).catch(function () {});
       }
@@ -357,7 +357,7 @@
       }
       var script = document.createElement('script');
       script.type = 'module';
-      script.src = assetUrl('js/game.js?v=1.4.7');
+      script.src = assetUrl('js/game.js?v=1.5.0');
       script.addEventListener('error', clearResumeLoading);
       document.body.appendChild(script);
     })();
