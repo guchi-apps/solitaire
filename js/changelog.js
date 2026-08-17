@@ -1,5 +1,5 @@
 /** package.json の version が正。npm version / npm run release:* で自動同期される */
-export const APP_VERSION = '1.5.2';
+export const APP_VERSION = '1.5.3';
 
 /**
  * アプリ内「更新履歴」に表示するデータ。
@@ -15,6 +15,13 @@ export const APP_VERSION = '1.5.2';
  *   リリース前に必ず置き換える
  */
 export const CHANGELOG = [
+  {
+    version: '1.5.3',
+    date: '2026-08-17',
+    changes: [
+      '今回のリリースはアプリの内部的なリリース運用の改善のみで、ゲームの操作性や見た目、機能に変更はありません。',
+    ],
+  },
   {
     version: '1.5.2',
     date: '2026-08-15',
