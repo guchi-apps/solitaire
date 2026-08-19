@@ -1526,6 +1526,39 @@ body.is-deal-animating {
   margin-bottom: 0;
 }
 
+/* 使い方（RELEASE_USAGE）。生成されないリリースがあるため、JS側で無いときは描かれない */
+.changelog-usage {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #f7fafc;
+  border: 1px solid #edf2f7;
+}
+
+.changelog-usage-title {
+  margin: 0 0 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--felt);
+}
+
+.changelog-usage-steps {
+  margin: 0;
+  padding: 0 0 0 1.2em;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: #4a5568;
+  word-break: break-word;
+}
+
+.changelog-usage-steps li {
+  margin-bottom: 3px;
+}
+
+.changelog-usage-steps li:last-child {
+  margin-bottom: 0;
+}
+
 body.on-start-screen .bottom-nav {
   pointer-events: none;
 }

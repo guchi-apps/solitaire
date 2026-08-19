@@ -57,6 +57,22 @@ describe('changelog structure', () => {
     }
   });
 
+  it('keeps usage as an optional non-empty list of steps', () => {
+    for (const entry of CHANGELOG) {
+      if (entry.usage === undefined) continue;
+      assert.ok(Array.isArray(entry.usage), `v${entry.version} usage must be an array`);
+      assert.ok(entry.usage.length > 0, `v${entry.version} usage must not be empty`);
+      for (const step of entry.usage) {
+        assert.equal(typeof step, 'string', `v${entry.version} usage step must be a string`);
+        assert.notEqual(step.trim(), '', `v${entry.version} usage step must not be blank`);
+        assert.ok(
+          !step.includes(PLACEHOLDER),
+          `v${entry.version} usage still contains placeholder text`,
+        );
+      }
+    }
+  });
+
   it('documents immutability of past entries in source comments', () => {
     const source = readFileSync(new URL('../js/changelog.js', import.meta.url), 'utf8');
     assert.match(source, /過去バージョンのエントリは変更しない/);
