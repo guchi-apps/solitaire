@@ -22,6 +22,11 @@
 
 CI（`.github/workflows/ci.yml`）は Node `'20'` で `npm test` → `npm run build` を実行する。
 
+**ローカルのNode 24では `npm test`（`node --test tests`）が失敗する。** Node 22以降は位置引数が
+ファイル・globとして解釈され、ディレクトリ名を渡すと `Cannot find module .../tests` になる
+（Node 24全般の挙動でこのリポジトリ固有ではない）。CIはNode 20のため影響しない。
+ローカルで実行するときは `node --test tests/*.test.js` を使う。
+
 **新しいテストは `tests/` に置き、`node --test` で動く形（`node:test` / `node:assert`）で書く。**
 テストフレームワークを追加したくなった場合は、下記「依存関係の追加」に従うこと。
 
