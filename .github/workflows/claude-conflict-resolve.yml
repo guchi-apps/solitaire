@@ -1,0 +1,73 @@
+name: Claude Conflict Resolve
+
+# develop向けPRがdevelopとの間でコンフリクトした際、Claude Codeが解消を試みるワークフローの、
+# 本リポジトリ側のトリガー定義。ジョブ本体は持たず、issue-deckの再利用可能ワークフローを
+# 参照する（guchi-apps/issue-deck#1066・#1090）。
+#
+# **このファイルはissue-deckの画面（設定＞フリート運用）から配布された雛形である**
+# （guchi-apps/issue-deck#1948）。`with:`の値は同じリポジトリの
+# claude-issue-dispatch.yml から写している。検証コマンド（verify-commands）や
+# ビルド用の環境変数（build-env）はリポジトリごとに違うため入っていない。
+# 自動解消の精度を上げたい場合は、issue-deck本体のcallerを参考に後から足す。
+#
+# 参照はタグ固定にする。@developを参照するとissue-deck側の不具合が即座に波及するため。
+#
+# トリガー(`on:`)はジョブ本体と違って各リポジトリのcallerが持つコピーなので、issue-deck側で
+# 直しても波及しない（guchi-apps/issue-deck#1366）。
+#
+# トリガー:
+# - workflow_run(CI / requested / develop): developへ変更が入るとOPENなPRが
+#   コンフリクトしうるため、その都度検知する。本来はpush(develop)で受けたいが、
+#   claude-code-actionはpushイベントに対応しておらず`Unsupported event type: push`で必ず
+#   失敗する（issue-deck#1330）。そのためpush(develop)で走るCIの`requested`
+#   (=実行がキューされた時点)を代理のpush通知として使う。**このリポジトリのCIワークフローの
+#   名前と一致していること**を確認する（違う名前なら発火しない）。
+#   なお workflow_run はデフォルトブランチ上のワークフローファイルでのみ発火する。
+# - pull_request(develop向け、opened/reopened): 作成時点で既にコンフリクトしているPRを拾う。
+# - schedule(15分おき): GitHubのmergeable判定は非同期のため、上記の直後は`UNKNOWN`のことが
+#   ある。その取りこぼしを拾い直す安全網。
+# - workflow_dispatch: 手動実行と、**issue-deckの画面の「コンフリクトを自動解消」ボタン**。
+#   issue_numberを渡すとそのIssueのdevelop向けPR1件だけを対象にする。
+on:
+  workflow_run:
+    workflows:
+      - "CI"
+    types:
+      - requested
+    branches:
+      - develop
+  pull_request:
+    types:
+      - opened
+      - reopened
+    branches:
+      - develop
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "対象のIssue番号（未指定ならdevelop向けの全OPEN PRを走査する）"
+        required: false
+        type: string
+
+jobs:
+  conflict-resolve:
+    uses: guchi-apps/issue-deck/.github/workflows/reusable-claude-conflict-resolve.yml@workflows/v24
+    with:
+      runtime-setup: minimal
+      package-manager: npm
+      node-version: "20"
+      # 再利用ワークフロー内のinputsコンテキストはworkflow_callのinputsを指すため、
+      # 本ワークフローのworkflow_dispatch入力はここで明示的に渡す。
+      issue-number: ${{ inputs.issue_number }}
+      # 上の uses: と同じタグを指定する。片方だけ上げると新しいワークフローで
+      # 古いプロンプトが使われる。
+      prompts-ref: workflows/v24
+    secrets: inherit
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      actions: read
+      id-token: write
