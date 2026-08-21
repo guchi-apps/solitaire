@@ -1064,6 +1064,31 @@ class SolitaireUI {
       }
 
       li.append(header, changes);
+
+      // usage（どう使うか）は生成されないリリースがあるため、あるときだけ枠ごと描く。
+      // 空の見出しだけが残ると書き漏らしに見えるため。
+      if (Array.isArray(entry.usage) && entry.usage.length > 0) {
+        const usage = document.createElement('div');
+        usage.className = 'changelog-usage';
+
+        const usageTitle = document.createElement('p');
+        usageTitle.className = 'changelog-usage-title';
+        usageTitle.textContent = '使い方';
+        usage.appendChild(usageTitle);
+
+        const steps = document.createElement('ol');
+        steps.className = 'changelog-usage-steps';
+        for (const text of entry.usage) {
+          const step = document.createElement('li');
+          // 番号はこのリストが振るため、文面側の `1. ` は落とす。
+          step.textContent = text.replace(/^\d+[.)]\s*/, '');
+          steps.appendChild(step);
+        }
+        usage.appendChild(steps);
+
+        li.appendChild(usage);
+      }
+
       this.changelogList.appendChild(li);
     }
   }

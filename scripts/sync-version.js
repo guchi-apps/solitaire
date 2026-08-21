@@ -20,6 +20,14 @@ function parseReleaseChangelog(raw) {
     .filter((line) => line !== '');
 }
 
+// 同じ経路で RELEASE_USAGE（利用者向けの操作手順）も渡ってくる。こちらは「何が変わったか」では
+// なく「どう使うか」（どこを開く / 何を押す / どうなれば成功か）のため、changes へ混ぜず
+// usage として別に持たせる。`1. ` で始まる番号付きの複数行で渡るので、1行1手順のまま保つ
+// （番号は画面側で振り直すため、ここでは changes と同じ規則で落とす）。
+function parseReleaseUsage(raw) {
+  return parseReleaseChangelog(raw);
+}
+
 // changes は生成された文面をそのまま埋め込むため、JavaScriptの文字列リテラルを
 // 壊さないようにエスケープする。
 function escapeForJs(value) {
@@ -51,11 +59,22 @@ if (!topVersionMatch) {
 }
 
 let insertedChanges = 0;
+let insertedUsage = 0;
 const topVersion = topVersionMatch[1];
 if (topVersion !== version) {
   const today = new Date().toISOString().slice(0, 10);
   const changes = parseReleaseChangelog(process.env.RELEASE_CHANGELOG);
+  const usage = parseReleaseUsage(process.env.RELEASE_USAGE);
   const items = changes.length > 0 ? changes : [PLACEHOLDER];
+  // 画面で使える変化が無いリリースでは使い方が生成されず空で渡る。そのときは usage の項目ごと
+  // 出力しない（空の見出しだけが残ると書き漏らしに見えるため）。
+  const usageBlock =
+    usage.length > 0
+      ? `
+    usage: [
+${usage.map((item) => `      '${escapeForJs(item)}',`).join('\n')}
+    ],`
+      : '';
   // 先頭に新エントリのみ追記する。過去バージョンのエントリは変更しない（js/changelog.js の記載ルール参照）。
   // RELEASE_CHANGELOG が未設定・空のとき（ローカルで npm version / npm run build を
   // 実行した場合）は、従来どおり手で埋めるための枠だけを作る。
@@ -64,10 +83,11 @@ if (topVersion !== version) {
     date: '${today}',
     changes: [
 ${items.map((item) => `      '${escapeForJs(item)}',`).join('\n')}
-    ],
+    ],${usageBlock}
   },
 `;
   insertedChanges = changes.length;
+  insertedUsage = usage.length;
   content = content.replace(
     /export const CHANGELOG = \[\n/,
     `export const CHANGELOG = [\n${newEntry}`,
@@ -104,8 +124,16 @@ indexContent = indexContent.replace(
 );
 fs.writeFileSync(indexPath, indexContent, 'utf8');
 
+const notes = [];
+if (insertedChanges > 0) {
+  notes.push(`${insertedChanges} change(s) from RELEASE_CHANGELOG`);
+}
+if (insertedUsage > 0) {
+  notes.push(`${insertedUsage} usage step(s) from RELEASE_USAGE`);
+}
+
 console.log(
-  insertedChanges > 0
-    ? `Synced version ${version} to js/changelog.js (${insertedChanges} change(s) from RELEASE_CHANGELOG)`
+  notes.length > 0
+    ? `Synced version ${version} to js/changelog.js (${notes.join(', ')})`
     : `Synced version ${version} to js/changelog.js`,
 );
