@@ -92,7 +92,15 @@ Alias /solitaire /var/www/html/solitaire
 1. `package.json` のバージョンから Git タグ（`v*`）を作成
 2. `npm run build` でバージョンを各ファイルに同期し、静的ファイルをビルド
 3. rsync でサーバーの `DEPLOY_PATH` へ転送（`--delete` で古いファイルを削除）
-4. **デプロイ成功後のみ** GitHub Release を作成
+4. 公開URL <https://klondike.game.gucchii.com/> へヘルスチェック（2秒間隔・最大5回）
+5. **デプロイ成功後のみ** GitHub Release を作成
+
+ヘルスチェックは `deploy` ジョブに SSH セッションが無いため、GitHub Actions のランナーから
+公開HTTPS を叩きます。経路に Apache と TLS を含むので vhost の破損も検知できます。
+200 が返るだけでなく `index.html` のルート要素（`<div id="app"`）が本文に含まれることまで
+確認します。`--delete` 付き rsync で公開ディレクトリを空にしてしまう事故を、200 応答だけでは
+拾えないためです。静的サイトで起動待ちが無いため、標準の「2秒間隔・最大60秒」ではなく
+Apache reload の瞬断を吸収できる長さ（10秒）にしています。
 
 手動でタグを push した場合は `.github/workflows/release.yml` が GitHub Release を作成します（`deploy.yml` 経由のタグ push は GITHUB_TOKEN のため別 workflow は起動しません）。
 
