@@ -3,7 +3,6 @@ Thumbs.db
 *.log
 .env
 .env.*
-!.github/deploy.env.tpl
 dist/
 
 # claude-issue-dispatch.yml が無人実行のたびにcheckoutする（リポジトリ管理外）
