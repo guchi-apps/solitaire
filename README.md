@@ -44,6 +44,8 @@ scripts/sync-github-secrets.sh             # 実際に同期
 
 organization の共通値（`SERVER_*`）はこのリポジトリからは同期しません（マニフェスト上は `inherit`）。issue-deck の画面のボタン（`.github/workflows/sync-secrets.yml`）からも同期を起こせます。
 
+> `sync-secrets.yml` は本体を issue-deck の `reusable-sync-secrets.yml` に置き、`secrets: inherit` で丸ごと渡しています。そのため `.github/` を `OP_SERVICE_ACCOUNT_TOKEN` で grep してもヒットしません。**使われていないと判断して消さないでください**（消すと同期が動かなくなります）。
+
 `main` ブランチへのプッシュで、ビルド → SSH デプロイが自動実行されます。
 
 **CI / デプロイ通知:** Signaly へ通知します（`.github/scripts/signaly-notify.sh`）。
