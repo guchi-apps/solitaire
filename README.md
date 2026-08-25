@@ -10,36 +10,45 @@ npm run dev
 
 ブラウザで [http://localhost:8080](http://localhost:8080) を開いて確認できます。
 
-## 環境変数の設定（1Password）
+## デプロイに使う値（GitHub secret / variable）
 
-デプロイ用の秘密情報は **1Password** で管理します。リポジトリに含まれる `.github/deploy.env.tpl` に secret reference が定義されています。
+ワークフローは実行時に **GitHub の secret / variable** から値を取ります（`op://` の実行時参照は行いません）。以前は実行のたびに 1Password から読んでいましたが、1Password サービスアカウントの日次レート制限（1Password アカウント全体で 1,000 リクエスト/日。サービスアカウントを分けても分割されません）を使い切り、フリート全体のデプロイが止まったためです（guchi-apps/issue-deck#1302）。
 
-### 1. 1Password にシークレットを登録
+どの値を GitHub 側のどこへ置くかの対応表は `.github/secrets-manifest.tsv` です。
 
-`apps` ボールトに以下のアイテムを作成し、フィールドを登録してください。
+### 1. GitHub 側に置く値
 
-| アイテム | フィールド名 | 説明 |
+SSH 接続情報（`SERVER_*`）は organization の共通値を継承します。このリポジトリ固有の値だけ repository の secret に置きます。
+
+| GitHub 側の名前 | スコープ | 説明 |
 | :--- | :--- | :--- |
-| `solitaire` | `DEPLOY_PATH` | 静的ファイルの配置先（例: `/var/www/html/solitaire`） |
-| `discord_webhook` | `CI_URL` | CI / デプロイ通知用 Discord Webhook URL（全アプリ共通） |
-| `githubaction-sshkey` | `PRIVATE_KEY` | SSH 秘密鍵（デプロイ用・他アプリと共通） |
-| `Server` | `host` | デプロイ先サーバーのホスト名または IP |
-| `Server` | `username` | SSH 接続ユーザー名 |
-| `Server` | `ssh-port` | SSH ポート番号（例: `22`） |
+| `SERVER_HOST` | organization | デプロイ先サーバーのホスト名または IP |
+| `SERVER_USERNAME` | organization | SSH 接続ユーザー名 |
+| `SERVER_SSH_PORT` | organization | SSH ポート番号（例: `22`） |
+| `SERVER_SSH_PRIVATE_KEY` | organization | SSH 秘密鍵（デプロイ用・他アプリと共通） |
+| `DEPLOY_PATH` | repository | 静的ファイルの配置先（例: `/var/www/html/solitaire`） |
+| `SIGNALY_WEBHOOK_URL` | repository | CI / デプロイ通知用 Signaly Webhook URL |
+| `OP_SERVICE_ACCOUNT_TOKEN` | repository | 1Password Service Account のトークン（`apps` ボールトへの読み取り権限）。**下記の同期でのみ使い、デプロイでは使いません** |
 
-`Server` と `githubaction-sshkey` は [portfolio](https://github.com/m-guchi/portfolio) などと共通のものを使えます。ボールト名やアイテム名を変更した場合は、`.github/deploy.env.tpl` 内の `op://` 参照も合わせて更新してください。
+ワークフローの `env:` ブロックは `scripts/generate-workflow-env-block.sh` で生成できます。
 
-### 2. GitHub Actions（CI/CD）
+### 2. 値を変えたときの同期（1Password が唯一の正）
 
-GitHub リポジトリには **1つだけ** シークレットを登録します。
+1Password（`apps` ボールトの `solitaire` アイテムほか）は「人が管理する唯一の正」として残します。値を変えたときだけ次を実行して GitHub 側へ同期してください。ここで使う `op` は**個人アカウントのセッション**のため、サービスアカウントの日次レート制限を消費しません。
 
-| Secret Name | 説明 |
-| :--- | :--- |
-| `OP_SERVICE_ACCOUNT_TOKEN` | 1Password Service Account のトークン（`apps` ボールトへの読み取り権限） |
+```bash
+op signin                                  # 個人アカウントでサインイン
+scripts/sync-github-secrets.sh --dry-run   # 差分だけ確認
+scripts/sync-github-secrets.sh             # 実際に同期
+```
 
-`main` ブランチへのプッシュで、ビルド → SSH デプロイが自動実行されます。デプロイに必要な SSH 情報はすべて 1Password から取得されます。
+organization の共通値（`SERVER_*`）はこのリポジトリからは同期しません（マニフェスト上は `inherit`）。issue-deck の画面のボタン（`.github/workflows/sync-secrets.yml`）からも同期を起こせます。
 
-**CI / デプロイ通知:** 現状は Discord。**Signaly へ移行予定** — [設計ガイド](https://github.com/m-guchi/docs/blob/main/README.md#ci--デプロイ通知) 参照。
+> `sync-secrets.yml` は本体を issue-deck の `reusable-sync-secrets.yml` に置き、`secrets: inherit` で丸ごと渡しています。そのため `.github/` を `OP_SERVICE_ACCOUNT_TOKEN` で grep してもヒットしません。**使われていないと判断して消さないでください**（消すと同期が動かなくなります）。
+
+`main` ブランチへのプッシュで、ビルド → SSH デプロイが自動実行されます。
+
+**CI / デプロイ通知:** Signaly へ通知します（`.github/scripts/signaly-notify.sh`）。
 
 - **CI:** `develop` への push は失敗時のみ、`main` 向け PR は成功・失敗・キャンセルを通知
 - **デプロイ / リリース:** `main` への push 後に結果を通知
@@ -83,7 +92,15 @@ Alias /solitaire /var/www/html/solitaire
 1. `package.json` のバージョンから Git タグ（`v*`）を作成
 2. `npm run build` でバージョンを各ファイルに同期し、静的ファイルをビルド
 3. rsync でサーバーの `DEPLOY_PATH` へ転送（`--delete` で古いファイルを削除）
-4. **デプロイ成功後のみ** GitHub Release を作成
+4. 公開URL <https://klondike.game.gucchii.com/> へヘルスチェック（2秒間隔・最大5回）
+5. **デプロイ成功後のみ** GitHub Release を作成
+
+ヘルスチェックは `deploy` ジョブに SSH セッションが無いため、GitHub Actions のランナーから
+公開HTTPS を叩きます。経路に Apache と TLS を含むので vhost の破損も検知できます。
+200 が返るだけでなく `index.html` のルート要素（`<div id="app"`）が本文に含まれることまで
+確認します。`--delete` 付き rsync で公開ディレクトリを空にしてしまう事故を、200 応答だけでは
+拾えないためです。静的サイトで起動待ちが無いため、標準の「2秒間隔・最大60秒」ではなく
+Apache reload の瞬断を吸収できる長さ（10秒）にしています。
 
 手動でタグを push した場合は `.github/workflows/release.yml` が GitHub Release を作成します（`deploy.yml` 経由のタグ push は GITHUB_TOKEN のため別 workflow は起動しません）。
 
@@ -142,12 +159,3 @@ git push origin develop
 | `npm run release:minor` | マイナー版リリース準備 |
 | `npm run release:major` | メジャー版リリース準備 |
 | `npm run icons` | `assets/icon.svg` から favicon / PWA アイコンを生成 |
-
-## CI/CD の既知の課題
-
-> 2026-06-29 時点で確認された課題です。対応が完了したら削除または更新してください。
-
-| 優先度 | 課題 | 対象ファイル |
-|--------|------|-------------|
-| 中 | Discord 通知を Signaly へ移行する（`discord-notify.sh` → `signaly-notify.sh`、`DISCORD_CI_WEBHOOK_URL` → `SIGNALY_WEBHOOK_URL`） | `.github/workflows/deploy.yml` |
-| 中 | **`notify-release` にバージョン番号が出ない** — `needs` に `tag` がなく `NOTIFY_VERSION` も未設定のため Signaly 通知にバージョンが表示されない。`needs: [tag, deploy, release]` + `NOTIFY_VERSION: ${{ needs.tag.outputs.tag }}` を追加する | `.github/workflows/deploy.yml` |

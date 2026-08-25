@@ -124,6 +124,41 @@ jobs:
           TARGET: ${{ env.DEPLOY_PATH }}
           REMOTE_PORT: ${{ env.SSH_PORT }}
 
+      # rsync は --delete 付きのため、DEPLOY_PATH の設定ミスやビルド成果物の
+      # 取りこぼしで公開ディレクトリを空にしてしまう事故が起こり得る。転送が
+      # 終わっただけでは緑にせず、公開URLの応答と中身まで確認する（#81）。
+      #
+      # deploy ジョブには SSH セッションが無い（easingthemes/ssh-deploy が内部で
+      # rsync するだけ）ので、ランナーから公開HTTPSを叩く。経路に Apache と TLS が
+      # 含まれるため vhost の破損も一緒に検知できる。
+      #
+      # 標準（guchi-apps/docs の standards/ci-deploy.md）は 2秒間隔・最大60秒だが、
+      # solitaire は静的サイトで再起動するプロセスが無く起動待ちが存在しない。
+      # Apache の reload と重なった瞬断だけを吸収できればよいので 5回（10秒）にする。
+      - name: Health check
+        env:
+          # 公開URLなので secrets にする必要は無い（このリポジトリは public）。
+          HEALTH_CHECK_URL: https://klondike.game.gucchii.com/
+          # 配信されているのがビルド成果物であることの目印（index.html のルート要素）。
+          # 200 だけを見ると、空ディレクトリを配信していても緑になり得る。
+          HEALTH_CHECK_MARKER: '<div id="app"'
+        run: |
+          for i in $(seq 1 5); do
+            if body=$(curl -fsS --max-time 10 "$HEALTH_CHECK_URL"); then
+              if printf '%s' "$body" | grep -qF "$HEALTH_CHECK_MARKER"; then
+                echo "Health check passed on attempt ${i}."
+                exit 0
+              fi
+              echo "Attempt ${i}: responded, but marker was not found in the body."
+            else
+              echo "Attempt ${i}: request to ${HEALTH_CHECK_URL} failed."
+            fi
+            sleep 2
+          done
+
+          echo "::error::Health check failed for ${HEALTH_CHECK_URL} after 5 attempts."
+          exit 1
+
   release:
     runs-on: ubuntu-latest
     needs: [tag, deploy]
