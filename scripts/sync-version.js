@@ -13,8 +13,12 @@ const PLACEHOLDER = '（更新内容を記入してください）';
 // リリース）では RELEASE_CHANGELOG を**空文字で**渡してくる（guchi-apps/issue-deck#2508）。
 // 空は「生成漏れ」ではなく「書くことが無い」という意味なので、手で埋める前提の
 // PLACEHOLDER ではなくこの既定文をそのまま採用する（#108）。
-const NO_USER_FACING_CHANGES =
-  '今回のリリースは内部の改善のみで、ゲームの操作や見た目に変更はありません。';
+//
+// 文言は「内部構造を変更しました。」から変えないこと。ユーザー向けの変更が1つも無いリリースでは
+// エントリ自体を作らないのが原則で、このリポジトリのように先頭エントリを省略できない
+// （tests/changelog.test.js が CHANGELOG[0].version === package.json の version を強制する）
+// 場合だけ、内訳を書かないこの1行にする決まりになっている（CLAUDE.md「リリース時の更新履歴」）。
+const NO_USER_FACING_CHANGES = '内部構造を変更しました。';
 
 // リリース自動化ワークフロー（release-develop-to-main.yml）は、developへ取り込まれた
 // 差分から利用者向けの更新履歴を生成し、環境変数 RELEASE_CHANGELOG で渡してくる。

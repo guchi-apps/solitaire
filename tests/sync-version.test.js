@@ -75,9 +75,7 @@ describe('sync-version RELEASE_CHANGELOG', () => {
     });
 
     const changelog = await loadChangelog(changelogPath);
-    assert.deepEqual(changelog[0].changes, [
-      '今回のリリースは内部の改善のみで、ゲームの操作や見た目に変更はありません。',
-    ]);
+    assert.deepEqual(changelog[0].changes, ['内部構造を変更しました。']);
   });
 
   // ローカルの npm version / npm run build では環境変数そのものが無い。こちらは従来どおり
