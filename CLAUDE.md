@@ -30,6 +30,26 @@ CI（`.github/workflows/ci.yml`）は Node `'20'` で `npm test` → `npm run bu
 **新しいテストは `tests/` に置き、`node --test` で動く形（`node:test` / `node:assert`）で書く。**
 テストフレームワークを追加したくなった場合は、下記「依存関係の追加」に従うこと。
 
+## リリース時の更新履歴（`RELEASE_CHANGELOG`）
+
+リリース自動化ワークフローは `npm version` の `"version"` lifecycle スクリプト
+（`scripts/sync-version.js`）を起動し、利用者向けの更新履歴を `RELEASE_CHANGELOG`、
+操作手順を `RELEASE_USAGE` で渡してくる。スクリプトはこれを `js/changelog.js` の先頭エントリへ
+書き込む。
+
+**空文字は「生成漏れ」ではなく「画面で使える変化が無いリリース」を意味する**
+（issue-deck#2508）。したがって `RELEASE_CHANGELOG` の扱いは次の3つを区別する。
+
+| 状態 | 意味 | 入る内容 |
+|---|---|---|
+| 未設定 | ローカルの `npm version` / `npm run build` | プレースホルダー（手で置き換える） |
+| 設定済み・空文字 | ワークフロー経由・利用者向けの変化なし | 「今回のリリースは内部の改善のみで〜」の既定文 |
+| 設定済み・文面あり | ワークフロー経由・変化あり | 渡された文面 |
+
+**空文字にプレースホルダーを入れてはいけない。** `tests/changelog.test.js` の
+「does not ship placeholder text」が検出して、リリースPRの初回CIが必ず落ちる（#108。
+v1.6.4〜v1.6.7 は毎回これで赤くなり、その都度あとから置き換えるコミットで復旧していた）。
+
 ## マルチエージェント運用（GitHub Actions 無人実行）
 
 `@claude` コメントを起点に、計画提示〜実装〜develop向けPR作成までを GitHub Actions 上で無人実行する。

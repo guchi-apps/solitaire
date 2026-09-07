@@ -64,6 +64,35 @@ after(() => {
   }
 });
 
+describe('sync-version RELEASE_CHANGELOG', () => {
+  // リリース自動化ワークフローは、画面で使える変化が無いリリースでは RELEASE_CHANGELOG を
+  // 空文字で渡してくる。ここでプレースホルダーを入れると、リリースPRの初回CIが
+  // tests/changelog.test.js の「does not ship placeholder text」で必ず落ちる（#108）。
+  it('uses the internal-change wording when the release hook passes an empty changelog', async () => {
+    const { changelogPath } = runSyncVersion({
+      version: '1.0.0',
+      env: { RELEASE_CHANGELOG: '', RELEASE_USAGE: '' },
+    });
+
+    const changelog = await loadChangelog(changelogPath);
+    assert.deepEqual(changelog[0].changes, [
+      '今回のリリースは内部の改善のみで、ゲームの操作や見た目に変更はありません。',
+    ]);
+  });
+
+  // ローカルの npm version / npm run build では環境変数そのものが無い。こちらは従来どおり
+  // 手で埋めるための枠を残す。
+  it('keeps the placeholder when the release hook did not run', async () => {
+    const { changelogPath } = runSyncVersion({
+      version: '1.0.0',
+      env: { RELEASE_CHANGELOG: undefined, RELEASE_USAGE: undefined },
+    });
+
+    const changelog = await loadChangelog(changelogPath);
+    assert.deepEqual(changelog[0].changes, ['（更新内容を記入してください）']);
+  });
+});
+
 describe('sync-version RELEASE_USAGE', () => {
   it('keeps each numbered line as its own usage step', async () => {
     const { changelogPath, stdout } = runSyncVersion({

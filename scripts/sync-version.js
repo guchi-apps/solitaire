@@ -9,6 +9,13 @@ const changelogPath = path.join(root, 'js', 'changelog.js');
 
 const PLACEHOLDER = '（更新内容を記入してください）';
 
+// リリース自動化ワークフローは、画面で使える変化が無いリリース（内部改善・CI/CDの更新だけの
+// リリース）では RELEASE_CHANGELOG を**空文字で**渡してくる（guchi-apps/issue-deck#2508）。
+// 空は「生成漏れ」ではなく「書くことが無い」という意味なので、手で埋める前提の
+// PLACEHOLDER ではなくこの既定文をそのまま採用する（#108）。
+const NO_USER_FACING_CHANGES =
+  '今回のリリースは内部の改善のみで、ゲームの操作や見た目に変更はありません。';
+
 // リリース自動化ワークフロー（release-develop-to-main.yml）は、developへ取り込まれた
 // 差分から利用者向けの更新履歴を生成し、環境変数 RELEASE_CHANGELOG で渡してくる。
 // 生成される文面は箇条書き・段落のどちらもありうるため、行単位に分解し、
@@ -65,7 +72,13 @@ if (topVersion !== version) {
   const today = new Date().toISOString().slice(0, 10);
   const changes = parseReleaseChangelog(process.env.RELEASE_CHANGELOG);
   const usage = parseReleaseUsage(process.env.RELEASE_USAGE);
-  const items = changes.length > 0 ? changes : [PLACEHOLDER];
+  // 空文字で渡ってくるのはリリース自動化ワークフロー経由のときだけで、環境変数そのものが
+  // 未設定なのはローカルで npm version / npm run build を実行したとき。前者は既定文を確定させ、
+  // 後者は従来どおり手で埋めるための枠を作る。**両者を混ぜるとリリースPRの初回CIが必ず落ちる**
+  // （tests/changelog.test.js の「does not ship placeholder text」・#108）。
+  const fallback =
+    process.env.RELEASE_CHANGELOG === undefined ? PLACEHOLDER : NO_USER_FACING_CHANGES;
+  const items = changes.length > 0 ? changes : [fallback];
   // 画面で使える変化が無いリリースでは使い方が生成されず空で渡る。そのときは usage の項目ごと
   // 出力しない（空の見出しだけが残ると書き漏らしに見えるため）。
   const usageBlock =
@@ -76,8 +89,6 @@ ${usage.map((item) => `      '${escapeForJs(item)}',`).join('\n')}
     ],`
       : '';
   // 先頭に新エントリのみ追記する。過去バージョンのエントリは変更しない（js/changelog.js の記載ルール参照）。
-  // RELEASE_CHANGELOG が未設定・空のとき（ローカルで npm version / npm run build を
-  // 実行した場合）は、従来どおり手で埋めるための枠だけを作る。
   const newEntry = `  {
     version: '${version}',
     date: '${today}',
