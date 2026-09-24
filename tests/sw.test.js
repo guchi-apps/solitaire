@@ -18,6 +18,7 @@ const REQUIRED_JS_MODULES = [
   'rules.js',
   'save.js',
   'settings.js',
+  'solitaire-game.js',
   'sounds.js',
   'stats.js',
 ];

@@ -15,6 +15,7 @@ const PRECACHE_URLS = [
   './js/rules.js',
   './js/save.js',
   './js/settings.js',
+  './js/solitaire-game.js',
   './js/sounds.js',
   './js/stats.js',
   './assets/apple-touch-icon.png?v=6',
