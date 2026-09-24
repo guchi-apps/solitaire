@@ -1455,6 +1455,8 @@ class SolitaireUI {
   undo() {
     if (this.game.undo()) {
       this.clearSelection();
+      this.persistVegasScoreIfNeeded();
+      this.updateScoreDisplay();
       this.render();
     }
   }
