@@ -21,13 +21,13 @@ AddType application/manifest+json .webmanifest
 </IfModule>
 
 <IfModule mod_headers.c>
-  <FilesMatch "\.(css|js|png|ico|svg|webmanifest)$">
+  <FilesMatch "\.(css|png|ico|svg|webmanifest)$">
     Header set Cache-Control "public, max-age=604800"
   </FilesMatch>
-  <FilesMatch "\.(html)$">
-    Header set Cache-Control "no-cache"
-  </FilesMatch>
-  <FilesMatch "sw\.js$">
+  # JSモジュールはimportにバージョンが付かない（./settings.js 等）ため、長期キャッシュすると
+  # デプロイ直後に新しいgame.jsと古い子モジュールが混ざって読み込みに失敗する（#130）。
+  # ETagで毎回再検証させる。
+  <FilesMatch "\.(html|js)$">
     Header set Cache-Control "no-cache"
   </FilesMatch>
 </IfModule>
