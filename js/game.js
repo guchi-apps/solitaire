@@ -256,6 +256,9 @@ class SolitaireGame {
     if (toInfo.type === 'foundation') {
       this.score += 5 * stack.length;
     }
+    if (fromInfo.type === 'foundation') {
+      this.score -= 5 * stack.length;
+    }
   }
 
   findEasyMoveDestination(fromInfo, cardIndex) {
@@ -1452,6 +1455,8 @@ class SolitaireUI {
   undo() {
     if (this.game.undo()) {
       this.clearSelection();
+      this.persistVegasScoreIfNeeded();
+      this.updateScoreDisplay();
       this.render();
     }
   }

@@ -1,12 +1,12 @@
-const CACHE_VERSION = '1.6.14';
+const CACHE_VERSION = '1.6.15';
 const CACHE_NAME = `solitaire-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
   './',
   './index.html',
-  './styles.css?v=1.6.14',
+  './styles.css?v=1.6.15',
   './manifest.webmanifest',
-  './js/game.js?v=1.6.14',
+  './js/game.js?v=1.6.15',
   './js/app-update.js',
   './js/changelog.js',
   './js/deal-quality.js',
@@ -46,7 +46,8 @@ async function openCache() {
 async function networkFirst(request, { fallbackUrls = [] } = {}) {
   const cache = await openCache();
   try {
-    const response = await fetch(request);
+    // network-firstはHTTPキャッシュを素通りさせて、古い子モジュールを掴まないようにする（#130）
+    const response = await fetch(request, { cache: 'no-cache' });
     if (response.ok && isCacheableAsset(request)) {
       await cache.put(request, response.clone());
     }
