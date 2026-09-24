@@ -1,5 +1,5 @@
 import { selectDealLayout, selectDealLayoutAsync } from './deal-quality.js';
-import { canPlaceOnTableau, canPlaceOnFoundation } from './rules.js';
+import { getPile, getMovableStack, canMove, applyMove, scoreTableauMove } from './rules.js';
 
 export class SolitaireGame {
   constructor() {
@@ -134,60 +134,15 @@ export class SolitaireGame {
   }
 
   getPile(pileInfo) {
-    switch (pileInfo.type) {
-      case 'stock': return this.stock;
-      case 'waste': return this.waste;
-      case 'foundation': return this.foundations[pileInfo.index];
-      case 'tableau': return this.tableau[pileInfo.index];
-      default: return [];
-    }
+    return getPile(this, pileInfo);
   }
 
   getMovableStack(pileInfo, cardIndex) {
-    const pile = this.getPile(pileInfo);
-    if (!pile.length) return null;
-
-    if (pileInfo.type === 'waste') {
-      if (cardIndex !== pile.length - 1) return null;
-      return [pile[pile.length - 1]];
-    }
-
-    if (pileInfo.type === 'foundation') {
-      if (cardIndex !== pile.length - 1) return null;
-      return [pile[pile.length - 1]];
-    }
-
-    if (pileInfo.type === 'tableau') {
-      const card = pile[cardIndex];
-      if (!card?.faceUp) return null;
-      const stack = pile.slice(cardIndex);
-      for (let i = 1; i < stack.length; i++) {
-        const prev = stack[i - 1];
-        const curr = stack[i];
-        if (!canPlaceOnTableau(curr, prev)) return null;
-      }
-      return stack;
-    }
-
-    return null;
+    return getMovableStack(this, pileInfo, cardIndex);
   }
 
   canMove(stack, destInfo) {
-    if (!stack?.length) return false;
-    const card = stack[0];
-    const dest = this.getPile(destInfo);
-
-    if (destInfo.type === 'foundation') {
-      if (stack.length > 1) return false;
-      return canPlaceOnFoundation(card, dest, destInfo.index);
-    }
-
-    if (destInfo.type === 'tableau') {
-      const top = dest[dest.length - 1] ?? null;
-      return canPlaceOnTableau(card, top);
-    }
-
-    return false;
+    return canMove(this, stack, destInfo);
   }
 
   moveCards(fromInfo, cardIndex, toInfo) {
@@ -195,21 +150,7 @@ export class SolitaireGame {
     if (!stack || !this.canMove(stack, toInfo)) return false;
 
     this.pushHistory();
-    const from = this.getPile(fromInfo);
-    const to = this.getPile(toInfo);
-
-    from.splice(cardIndex, stack.length);
-    to.push(...stack);
-
-    this.lastFlip = false;
-    if (fromInfo.type === 'tableau' && from.length) {
-      const last = from[from.length - 1];
-      if (!last.faceUp) {
-        last.faceUp = true;
-        this.lastFlip = true;
-      }
-    }
-
+    this.lastFlip = applyMove(this, fromInfo, cardIndex, toInfo, stack);
     this.moves++;
     this.applyVegasScoring(fromInfo, toInfo, stack);
     this.checkWin();
@@ -252,18 +193,7 @@ export class SolitaireGame {
   }
 
   scoreTableauEasyMove(fromInfo, cardIndex, stack, dest) {
-    const destPile = this.getPile(dest);
-    let score = 0;
-
-    if (!destPile.length && stack[0].value === 13) score += 100;
-    if (fromInfo.type === 'waste') score += 30;
-    if (fromInfo.type === 'tableau') {
-      const fromPile = this.getPile(fromInfo);
-      const below = fromPile[cardIndex - 1];
-      if (below && !below.faceUp) score += 80;
-    }
-
-    return score - dest.index;
+    return scoreTableauMove(this, fromInfo, cardIndex, stack, dest);
   }
 
   findEasyMoveSourceToDest(destInfo) {

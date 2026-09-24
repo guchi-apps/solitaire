@@ -71,3 +71,28 @@ describe('pile ids', () => {
     });
   });
 });
+
+import { getMovableStack, canMove, applyMove, scoreTableauMove } from '../js/rules.js';
+
+const c = (suit, value, faceUp = true) => ({ suit, rank: String(value), value, faceUp });
+
+it('盤面を引数に取るルール関数: 移動可能な束・移動判定・適用・点数が一貫する', () => {
+  const state = {
+    stock: [],
+    waste: [c('hearts', 5)],
+    foundations: [[], [], [], []],
+    tableau: [[c('clubs', 9, false), c('spades', 6)], [c('diamonds', 7)], [], [], [], [], []],
+  };
+  const stack = getMovableStack(state, { type: 'waste' }, 0);
+  assert.equal(stack.length, 1);
+  assert.equal(canMove(state, stack, { type: 'tableau', index: 0 }), true);
+  assert.equal(canMove(state, stack, { type: 'tableau', index: 1 }), false);
+
+  const tStack = getMovableStack(state, { type: 'tableau', index: 0 }, 1);
+  const dest = { type: 'tableau', index: 1 };
+  assert.equal(canMove(state, tStack, dest), true);
+  assert.equal(scoreTableauMove(state, { type: 'tableau', index: 0 }, 1, tStack, dest), 80 - 1);
+  assert.equal(applyMove(state, { type: 'tableau', index: 0 }, 1, dest, tStack), true);
+  assert.equal(state.tableau[0][0].faceUp, true);
+  assert.equal(state.tableau[1].length, 2);
+});

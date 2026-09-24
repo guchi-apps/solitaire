@@ -1,4 +1,4 @@
-import { createDeck, shuffle, canPlaceOnTableau, canPlaceOnFoundation } from './rules.js';
+import { createDeck, shuffle, getMovableStack, canMove, applyMove, scoreTableauMove } from './rules.js';
 
 export const VEGAS_ENTRY_FEE = 52;
 export const VEGAS_FOUNDATION_REWARD = 5;
@@ -48,77 +48,10 @@ export function buildLayoutFromDeck(deck) {
   };
 }
 
-function getPile(state, pileInfo) {
-  switch (pileInfo.type) {
-    case 'stock': return state.stock;
-    case 'waste': return state.waste;
-    case 'foundation': return state.foundations[pileInfo.index];
-    case 'tableau': return state.tableau[pileInfo.index];
-    default: return [];
-  }
-}
-
-function getMovableStack(state, pileInfo, cardIndex) {
-  const pile = getPile(state, pileInfo);
-  if (!pile.length) return null;
-
-  if (pileInfo.type === 'waste') {
-    if (cardIndex !== pile.length - 1) return null;
-    return [pile[pile.length - 1]];
-  }
-
-  if (pileInfo.type === 'foundation') {
-    if (cardIndex !== pile.length - 1) return null;
-    return [pile[pile.length - 1]];
-  }
-
-  if (pileInfo.type === 'tableau') {
-    const card = pile[cardIndex];
-    if (!card?.faceUp) return null;
-    const stack = pile.slice(cardIndex);
-    for (let i = 1; i < stack.length; i++) {
-      const prev = stack[i - 1];
-      const curr = stack[i];
-      if (!canPlaceOnTableau(curr, prev)) return null;
-    }
-    return stack;
-  }
-
-  return null;
-}
-
-function canMove(state, stack, destInfo) {
-  if (!stack?.length) return false;
-  const card = stack[0];
-  const dest = getPile(state, destInfo);
-
-  if (destInfo.type === 'foundation') {
-    if (stack.length > 1) return false;
-    return canPlaceOnFoundation(card, dest, destInfo.index);
-  }
-
-  if (destInfo.type === 'tableau') {
-    const top = dest[dest.length - 1] ?? null;
-    return canPlaceOnTableau(card, top);
-  }
-
-  return false;
-}
-
 function moveCards(state, fromInfo, cardIndex, toInfo) {
   const stack = getMovableStack(state, fromInfo, cardIndex);
   if (!stack || !canMove(state, stack, toInfo)) return false;
-
-  const from = getPile(state, fromInfo);
-  const to = getPile(state, toInfo);
-  from.splice(cardIndex, stack.length);
-  to.push(...stack);
-
-  if (fromInfo.type === 'tableau' && from.length) {
-    const last = from[from.length - 1];
-    if (!last.faceUp) last.faceUp = true;
-  }
-
+  applyMove(state, fromInfo, cardIndex, toInfo, stack);
   return true;
 }
 
@@ -135,23 +68,6 @@ function drawFromStock(state, vegasMode) {
   card.faceUp = true;
   state.waste.push(card);
   return true;
-}
-
-function scoreTableauMove(state, fromInfo, cardIndex, destInfo) {
-  let score = 0;
-  const stack = getMovableStack(state, fromInfo, cardIndex);
-  const destPile = getPile(state, destInfo);
-  if (!stack) return score;
-
-  if (!destPile.length && stack[0].value === 13) score += 100;
-  if (fromInfo.type === 'waste') score += 30;
-  if (fromInfo.type === 'tableau') {
-    const fromPile = getPile(state, fromInfo);
-    const below = fromPile[cardIndex - 1];
-    if (below && !below.faceUp) score += 80;
-  }
-
-  return score - destInfo.index;
 }
 
 function tryFoundationMove(state) {
@@ -210,7 +126,7 @@ function tryTableauMove(state) {
       if (fromInfo.type === 'tableau' && fromInfo.index === col) continue;
       const dest = { type: 'tableau', index: col };
       if (!canMove(state, stack, dest)) continue;
-      const score = scoreTableauMove(state, fromInfo, index, dest);
+      const score = scoreTableauMove(state, fromInfo, index, stack, dest);
       if (score > bestScore) {
         bestScore = score;
         best = { from: fromInfo, index, dest };
@@ -332,32 +248,6 @@ function resolveDealSearchResult({ bandCandidates, best }) {
   return best.layout;
 }
 
-function pickDealFromSearch({ scoreTarget, vegasMode }) {
-  const bandCandidates = [];
-  let best = null;
-  let bestScoreDistance = Infinity;
-
-  for (let attempts = 0; attempts < MAX_SEARCH_ATTEMPTS; attempts++) {
-    const candidate = evaluateShuffledDeal(vegasMode);
-    const estimatedScore = estimateVegasScoreFromFoundationMoves(candidate.moves);
-    const scoreDistance = Math.abs(estimatedScore - scoreTarget);
-
-    if (scoreDistance < bestScoreDistance) {
-      bestScoreDistance = scoreDistance;
-      best = candidate;
-    }
-
-    if (scoreDistance <= SCORE_BAND_HALF_WIDTH) {
-      bandCandidates.push(candidate);
-      if (isBandSearchComplete(bandCandidates)) {
-        break;
-      }
-    }
-  }
-
-  return resolveDealSearchResult({ bandCandidates, best });
-}
-
 const DEAL_SEARCH_YIELD_EVERY = 4;
 
 function yieldToMain() {
@@ -366,21 +256,11 @@ function yieldToMain() {
   });
 }
 
-export function selectDealLayout({ vegasMode = false, dealDifficulty = 'normal' } = {}) {
-  if (dealDifficulty === 'veryHard') {
-    return evaluateShuffledDeal(vegasMode).layout;
-  }
-
-  const scoreTarget = getDealDifficultyScoreTarget(dealDifficulty);
-  return pickDealFromSearch({ scoreTarget, vegasMode });
-}
-
-export async function selectDealLayoutAsync({ vegasMode = false, dealDifficulty = 'normal' } = {}) {
-  if (dealDifficulty === 'veryHard') {
-    return evaluateShuffledDeal(vegasMode).layout;
-  }
-
-  const scoreTarget = getDealDifficultyScoreTarget(dealDifficulty);
+/**
+ * 探索ループの本体。1候補を評価するたびに yield し、最後に選んだ配札を return する。
+ * 同期版は yield を読み飛ばし、非同期版は yield のたびに一定間隔でメインスレッドへ処理を戻す。
+ */
+function* searchDealSteps({ scoreTarget, vegasMode }) {
   const bandCandidates = [];
   let best = null;
   let bestScoreDistance = Infinity;
@@ -397,15 +277,36 @@ export async function selectDealLayoutAsync({ vegasMode = false, dealDifficulty 
 
     if (scoreDistance <= SCORE_BAND_HALF_WIDTH) {
       bandCandidates.push(candidate);
-      if (isBandSearchComplete(bandCandidates)) {
-        break;
-      }
+      if (isBandSearchComplete(bandCandidates)) break;
     }
 
-    if (attempts % DEAL_SEARCH_YIELD_EVERY === DEAL_SEARCH_YIELD_EVERY - 1) {
-      await yieldToMain();
-    }
+    yield attempts;
   }
 
   return resolveDealSearchResult({ bandCandidates, best });
+}
+
+export function selectDealLayout({ vegasMode = false, dealDifficulty = 'normal' } = {}) {
+  if (dealDifficulty === 'veryHard') {
+    return evaluateShuffledDeal(vegasMode).layout;
+  }
+
+  const search = searchDealSteps({ scoreTarget: getDealDifficultyScoreTarget(dealDifficulty), vegasMode });
+  let step = search.next();
+  while (!step.done) step = search.next();
+  return step.value;
+}
+
+export async function selectDealLayoutAsync({ vegasMode = false, dealDifficulty = 'normal' } = {}) {
+  if (dealDifficulty === 'veryHard') {
+    return evaluateShuffledDeal(vegasMode).layout;
+  }
+
+  const search = searchDealSteps({ scoreTarget: getDealDifficultyScoreTarget(dealDifficulty), vegasMode });
+  let step = search.next();
+  while (!step.done) {
+    if (step.value % DEAL_SEARCH_YIELD_EVERY === DEAL_SEARCH_YIELD_EVERY - 1) await yieldToMain();
+    step = search.next();
+  }
+  return step.value;
 }
