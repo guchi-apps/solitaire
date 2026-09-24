@@ -65,8 +65,15 @@ v1.6.4〜v1.6.7 は毎回これで赤くなり、その都度あとから置き�
 ## マルチエージェント運用（GitHub Actions 無人実行）
 
 `@claude` コメントを起点に、計画提示〜実装〜develop向けPR作成までを GitHub Actions 上で無人実行する。
-ワークフローの実体は `guchi-apps/issue-deck` にあり、このリポジトリの `.github/workflows/` には
-`uses:` で参照する薄い caller だけを置いている（`@workflows/v9`）。
+無人実行まわりのワークフローの実体は `guchi-apps/issue-deck` にあり、このリポジトリの
+`.github/workflows/` には `uses:` で参照する薄い caller を置いている。**参照先のタグ
+（`@workflows/vN`）は頻繁に上がるため、ここには書かない。正は各 `.github/workflows/*.yml` の
+`uses:` 行**であり、このファイルのタグ記述を根拠にしないこと。
+
+caller 以外に、このリポジトリ自身が実体を持つワークフローもある（`ci.yml`・`deploy.yml`・
+`release.yml`）。
+
+以下は主な caller のみ。
 
 | ファイル | 役割 |
 |---|---|
