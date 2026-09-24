@@ -142,6 +142,18 @@ describe('saveGame / loadSavedGame / clearSavedGame', () => {
     assert.equal(loaded.playTimeMs, 12345);
   });
 
+  it('does not throw when localStorage.setItem fails (quota exceeded)', () => {
+    const original = localStorage.setItem;
+    localStorage.setItem = () => {
+      throw new Error('QuotaExceededError');
+    };
+    try {
+      assert.doesNotThrow(() => saveGame(makeGame()));
+    } finally {
+      localStorage.setItem = original;
+    }
+  });
+
   it('clears any existing save instead of persisting a won game', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeGame(makeGame())));
     saveGame(makeGame({ won: true }));
