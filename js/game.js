@@ -1070,6 +1070,7 @@ class SolitaireUI {
       this.persistVegasScoreIfNeeded();
       this.updateScoreDisplay();
       this.render();
+      this.persistGameSave();
     }
   }
 
@@ -1112,6 +1113,7 @@ class SolitaireUI {
     }
     this.persistVegasScoreIfNeeded();
     this.updateScoreDisplay();
+    this.persistGameSave();
   }
 
   updateAutoCompleteButton() {
@@ -1148,6 +1150,7 @@ class SolitaireUI {
 
     this.autoCompleting = false;
     this.render();
+    this.persistGameSave();
   }
 
   clearSelection() {
@@ -1815,6 +1818,7 @@ class SolitaireUI {
       document.body.classList.add('is-stock-animating');
 
       g.drawFromStock();
+      this.persistGameSave();
       this.clearSelection();
 
       const skipAnim = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1846,6 +1850,7 @@ class SolitaireUI {
     document.body.classList.add('is-stock-animating');
 
     g.drawFromStock();
+    this.persistGameSave();
     this.clearSelection();
 
     const skipAnim = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -2077,7 +2082,6 @@ class SolitaireUI {
     this.updateBottomNav();
     this.updateAutoCompleteButton();
     this.updateScoreDisplay();
-    this.persistGameSave();
   }
 
   showWin() {
