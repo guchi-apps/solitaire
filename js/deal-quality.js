@@ -187,6 +187,17 @@ function tryFoundationMove(state) {
   return false;
 }
 
+/**
+ * 場札から場札への移動が「先へ進む手」かを判定する。
+ * 裏向きカードをめくる手と、列を空にする手（Kは空列間の往復になるので除く）だけを許可し、
+ * 同じ局面へ戻れる往復手でシミュレーターが空転しないようにする。
+ */
+function isProgressingTableauSource(state, fromInfo, cardIndex, stack) {
+  if (cardIndex === 0) return stack[0].value !== 13;
+  const below = state.tableau[fromInfo.index][cardIndex - 1];
+  return !below.faceUp;
+}
+
 function tryTableauMove(state) {
   let best = null;
   let bestScore = -Infinity;
@@ -194,6 +205,7 @@ function tryTableauMove(state) {
   const trySource = (fromInfo, index) => {
     const stack = getMovableStack(state, fromInfo, index);
     if (!stack) return;
+    if (fromInfo.type === 'tableau' && !isProgressingTableauSource(state, fromInfo, index, stack)) return;
     for (let col = 0; col < 7; col++) {
       if (fromInfo.type === 'tableau' && fromInfo.index === col) continue;
       const dest = { type: 'tableau', index: col };
@@ -223,12 +235,12 @@ function tryTableauMove(state) {
   return moveCards(state, best.from, best.index, best.dest);
 }
 
-export function countFoundationMoves(layout, vegasMode = false) {
+/** `stats` を渡すと、消費した手数を `stats.steps` に書き込む（空転していないことの検証用） */
+export function countFoundationMoves(layout, vegasMode = false, stats = null) {
   const state = cloneLayout(layout);
   let foundationMoves = 0;
   let stagnantRounds = 0;
-  let stockPassesWithoutProgress = 0;
-  let sawStockRefill = false;
+  let movedSinceRecycle = true;
   const maxSteps = 3000;
   let steps = 0;
 
@@ -239,31 +251,25 @@ export function countFoundationMoves(layout, vegasMode = false) {
       foundationMoves++;
       progressed = true;
       steps++;
-      stockPassesWithoutProgress = 0;
+      movedSinceRecycle = true;
     }
 
     if (tryTableauMove(state)) {
       progressed = true;
       stagnantRounds = 0;
-      stockPassesWithoutProgress = 0;
+      movedSinceRecycle = true;
       steps++;
       continue;
     }
 
-    const stockBefore = state.stock.length;
-    const wasteBefore = state.waste.length;
+    const recycling = state.stock.length === 0 && state.waste.length > 0;
+    // 山札を1周させても場札・組札への手が1つも無ければ、これ以上進まない
+    if (recycling && !vegasMode && !movedSinceRecycle) break;
     if (drawFromStock(state, vegasMode)) {
       progressed = true;
       stagnantRounds = 0;
       steps++;
-      if (!vegasMode && stockBefore === 0 && wasteBefore > 0) {
-        sawStockRefill = true;
-      }
-      if (sawStockRefill && state.stock.length === 0 && state.waste.length === 0) {
-        stockPassesWithoutProgress++;
-        sawStockRefill = false;
-        if (stockPassesWithoutProgress >= 1) break;
-      }
+      if (recycling) movedSinceRecycle = false;
       continue;
     }
 
@@ -271,6 +277,7 @@ export function countFoundationMoves(layout, vegasMode = false) {
     else stagnantRounds = 0;
   }
 
+  if (stats) stats.steps = steps;
   return foundationMoves;
 }
 

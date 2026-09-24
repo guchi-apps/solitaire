@@ -59,7 +59,11 @@ export function saveGame(game) {
     clearSavedGame();
     return;
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeGame(game)));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeGame(game)));
+  } catch {
+    // 容量超過・保存禁止でもゲームの進行を止めない
+  }
 }
 
 export function clearSavedGame() {

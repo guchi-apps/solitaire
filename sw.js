@@ -1,12 +1,12 @@
-const CACHE_VERSION = '1.6.15';
+const CACHE_VERSION = '1.6.16';
 const CACHE_NAME = `solitaire-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
   './',
   './index.html',
-  './styles.css?v=1.6.15',
+  './styles.css?v=1.6.16',
   './manifest.webmanifest',
-  './js/game.js?v=1.6.15',
+  './js/game.js?v=1.6.16',
   './js/app-update.js',
   './js/changelog.js',
   './js/deal-quality.js',
@@ -15,6 +15,7 @@ const PRECACHE_URLS = [
   './js/rules.js',
   './js/save.js',
   './js/settings.js',
+  './js/solitaire-game.js',
   './js/sounds.js',
   './js/stats.js',
   './assets/apple-touch-icon.png?v=6',
