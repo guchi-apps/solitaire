@@ -10,7 +10,7 @@ import {
   DEAL_DIFFICULTY_SCORE_TARGETS,
   SCORE_BAND_HALF_WIDTH,
 } from '../js/deal-quality.js';
-import { createDeck } from '../js/rules.js';
+import { createDeck, shuffle } from '../js/rules.js';
 
 describe('countFoundationMoves', () => {
   it('counts foundation placements during simulated play', () => {
@@ -19,6 +19,32 @@ describe('countFoundationMoves', () => {
     const moves = countFoundationMoves(layout, true);
     assert.equal(typeof moves, 'number');
     assert.ok(moves >= 0);
+  });
+
+  it('does not spin on reversible tableau moves (stays under the step cap)', () => {
+    for (const vegas of [false, true]) {
+      let capped = 0;
+      for (let i = 0; i < 100; i++) {
+        const layout = buildLayoutFromDeck(shuffle(createDeck()));
+        const stats = {};
+        countFoundationMoves(layout, vegas, stats);
+        if (stats.steps >= 3000) capped++;
+      }
+      assert.equal(capped, 0, `vegas=${vegas}: ${capped}/100 deals hit the step cap`);
+    }
+  });
+
+  it('does not shuttle a king between empty columns', () => {
+    const king = { suit: 'spades', value: 13, faceUp: true };
+    const layout = {
+      stock: [],
+      waste: [],
+      foundations: [[], [], [], []],
+      tableau: [[king], [], [], [], [], [], []],
+    };
+    const stats = {};
+    countFoundationMoves(layout, true, stats);
+    assert.ok(stats.steps < 10, `steps=${stats.steps}`);
   });
 });
 
