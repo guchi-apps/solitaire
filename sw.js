@@ -46,7 +46,8 @@ async function openCache() {
 async function networkFirst(request, { fallbackUrls = [] } = {}) {
   const cache = await openCache();
   try {
-    const response = await fetch(request);
+    // network-firstはHTTPキャッシュを素通りさせて、古い子モジュールを掴まないようにする（#130）
+    const response = await fetch(request, { cache: 'no-cache' });
     if (response.ok && isCacheableAsset(request)) {
       await cache.put(request, response.clone());
     }
