@@ -1,12 +1,12 @@
-const CACHE_VERSION = '1.6.22';
+const CACHE_VERSION = '1.6.23';
 const CACHE_NAME = `solitaire-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
   './',
   './index.html',
-  './styles.css?v=1.6.22',
+  './styles.css?v=1.6.23',
   './manifest.webmanifest',
-  './js/game.js?v=1.6.22',
+  './js/game.js?v=1.6.23',
   './js/app-update.js',
   './js/changelog.js',
   './js/deal-quality.js',
