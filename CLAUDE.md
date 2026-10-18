@@ -33,9 +33,9 @@ CI（`.github/workflows/ci.yml`）は Node `'20'` で `npm test` → `npm run bu
 **このアプリ専用の鍵**（`SSH_PRIVATE_KEY`＝`op://apps/solitaire/deploy-ssh-key`）で `upload` → `env` → `deploy` の3語だけを送る。
 organization 共通の `SERVER_SSH_PRIVATE_KEY` と rsync（`easingthemes/ssh-deploy`）はもう使わない。
 
-- **gate のアプリ名は `solitaire`。** 置き場は `/home/github-user/apps/solitaire` 固定で、公開されるのは `public/`。`DEPLOY_PATH` は使わない
+- **gate のアプリ名は `solitaire`。** 置き場は `/home/github-user/apps/solitaire` 固定で、gate は `public/` を公開先 `/var/www/html/klondike.game.gucchii.com`（vps の `scripts/app-deploy-gate-static-roots` が決める。vps#308）へ同期する。DocumentRoot を置き場へ向けない（`/home/github-user` は Apache に開かない）。`DEPLOY_PATH` は使わない
 - **配布物は `public/`（従来の dist の中身。`.htaccess`・`version.json` を含む）と `deploy/gate-static` だけ。** `deploy/gate-static` が
-  静的アプリの目印で、gate は依存・マイグレーション・pm2 を動かさず、権限を整えて `public/version.json` の `sha` を `.env` の
+  静的アプリの目印で、gate は依存・マイグレーション・pm2 を動かさず、公開先へ同期して公開先の `version.json` の `sha` を `.env` の
   `APP_COMMIT_SHA` と照合する。`deploy/gate-static` を消すと gate が `PORT` を要求して失敗する
 - **gate へ送る変数は `APP_COMMIT_SHA` だけ**（静的アプリは `PORT` 不要）。gate の外の処理は SSH 先で動かせない
 - 公開URLのヘルスチェックと `version.json` の照合はランナー側に残す（gate は Apache がどこを配信しているかを見ないため）

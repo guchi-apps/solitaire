@@ -85,7 +85,7 @@ jobs:
 
       # **VPSのgate（/usr/local/sbin/app-deploy-gate。guchi-apps/vps#275・#305）へ渡す配布物**（#197）。
       # 静的アプリの形: 公開する中身は public/、目印は deploy/gate-static。gate は置き場
-      # （/home/github-user/apps/solitaire）で public/ を入れ替え、依存・マイグレーション・pm2 を動かさない。
+      # （/home/github-user/apps/solitaire）へ展開した public/ を公開先へ同期し、依存・マイグレーション・pm2 を動かさない。
       # それ以外（deploy/.htaccess の原本など）は入れない。gate はリンク・特殊ファイルを含む配布物を断るため、
       # ここでも確かめる。隠しファイル（.htaccess）が入ることも確かめる（入らないと no-store・dotfile の拒否が効かない）。
       - name: Create deploy archive
@@ -160,9 +160,9 @@ jobs:
       # 鍵はこのアプリ専用で、VPSのauthorized_keysのcommand=がgateのアプリ名 solitaire
       # （置き場 /home/github-user/apps/solitaire）を固定する。任意のシェルコマンドは実行できず、
       # upload・env・deploy の3語だけが通る。配布物に deploy/gate-static があるので、gate は
-      # 前回配布物の削除 → public/ の展開 → 権限の調整（置き場 711・public 755/644）→
-      # public/version.json の sha と .env の APP_COMMIT_SHA の照合までを行い、依存・pm2 は動かさない。
-      # 公開されるのは /home/github-user/apps/solitaire/public（ApacheのDocumentRootは guchi-apps/vps 側）。
+      # 前回配布物の削除 → public/ の展開 → 公開先 /var/www/html/klondike.game.gucchii.com への同期（755/644・
+      # 公開先にだけあるものは削除）→ 公開先の version.json の sha と .env の APP_COMMIT_SHA の照合までを行い、
+      # 依存・pm2 は動かさない。公開先は guchi-apps/vps の scripts/app-deploy-gate-static-roots が決める（vps#308）。
       - name: Upload archive
         run: ssh -p "${SSH_PORT}" "${SSH_USERNAME}@${SSH_HOST}" upload < deploy.tar.gz
 
@@ -184,7 +184,7 @@ jobs:
       - name: Deploy
         run: ssh -p "${SSH_PORT}" "${SSH_USERNAME}@${SSH_HOST}" deploy
 
-      # gate の照合は置き場のファイルまで。ApacheのDocumentRoot・vhost・TLS の破損は見えないので、
+      # gate の照合は公開先のファイルまで。ApacheのDocumentRoot・vhost・TLS の破損は見えないので、
       # 公開URLの応答と中身もランナーから確かめる（#81）。
       #
       # 標準（guchi-apps/docs の standards/ci-deploy.md）は 2秒間隔・最大60秒だが、
@@ -214,8 +214,8 @@ jobs:
           echo "::error::Health check failed for ${HEALTH_CHECK_URL} after 5 attempts."
           exit 1
 
-      # 置き場のファイルが新しくても、Apache が別のディレクトリを配信していれば公開URLは古いまま
-      # （DocumentRoot の移し忘れ・経路上のキャッシュ）。公開URLの version.json の sha がこの実行の
+      # 公開先のファイルが新しくても、Apache が別のディレクトリを配信していれば公開URLは古いまま
+      # （DocumentRoot の食い違い・経路上のキャッシュ）。公開URLの version.json の sha がこの実行の
       # コミットと一致するまで成功にしない（#193）。version.json は .htaccess で no-store・
       # Service Worker の対象外にしてあるが、経路上のキャッシュに備えて毎回クエリを変えて取りにいく。
       - name: Verify deployed version
