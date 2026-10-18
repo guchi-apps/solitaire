@@ -30,4 +30,9 @@ AddType application/manifest+json .webmanifest
   <FilesMatch "\.(html|js)$">
     Header set Cache-Control "no-cache"
   </FilesMatch>
+  # 配信中の版の照合に使う（#193）。キャッシュされると、デプロイ後も古い sha が返り
+  # デプロイの確認と issue-deck の稼働確認が食い違うため、一切保存させない。
+  <Files "version.json">
+    Header set Cache-Control "no-store"
+  </Files>
 </IfModule>

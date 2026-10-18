@@ -74,6 +74,10 @@ jobs:
           cp index.html styles.css manifest.webmanifest sw.js dist/
           cp -r js assets dist/
           cp deploy/.htaccess dist/.htaccess
+          # 配信する版を外から確かめるための版情報（#193）。deploy ジョブの照合と、
+          # issue-deck の稼働確認（公開URLとして登録する）が読む。
+          node scripts/write-version-json.js dist "${{ github.sha }}"
+          test -f dist/version.json
           test -f dist/assets/icon-192.png
           test -f dist/assets/icon-512.png
           test -f dist/assets/favicon-32.png
@@ -157,6 +161,34 @@ jobs:
           done
 
           echo "::error::Health check failed for ${HEALTH_CHECK_URL} after 5 attempts."
+          exit 1
+
+      # 応答が返るだけでは、新しい版が配信されているとは限らない（rsync の取りこぼし・
+      # キャッシュ）。公開URLの version.json の sha がこの実行のコミットと一致するまで
+      # 成功にしない（#193）。version.json は .htaccess で no-store・Service Worker の対象外に
+      # してあるが、経路上のキャッシュに備えて毎回クエリを変えて取りにいく。
+      - name: Verify deployed version
+        env:
+          VERSION_CHECK_URL: https://klondike.game.gucchii.com/version.json
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          attempts=24
+          for i in $(seq 1 "$attempts"); do
+            url="${VERSION_CHECK_URL}?_=$(date +%s)-${i}"
+            if body=$(curl -fsS --max-time 10 -H 'Cache-Control: no-cache' -H 'Pragma: no-cache' "$url"); then
+              actual=$(printf '%s' "$body" | jq -r '.sha // empty' 2>/dev/null || true)
+              if [ "$actual" = "$EXPECTED_SHA" ]; then
+                echo "Deployed version matches ${EXPECTED_SHA} on attempt ${i}."
+                exit 0
+              fi
+              echo "Attempt ${i}: sha is '${actual}', expected '${EXPECTED_SHA}'."
+            else
+              echo "Attempt ${i}: request to ${VERSION_CHECK_URL} failed."
+            fi
+            sleep 5
+          done
+
+          echo "::error::${VERSION_CHECK_URL} did not report ${EXPECTED_SHA} within $((attempts * 5)) seconds."
           exit 1
 
   release:
