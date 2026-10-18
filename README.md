@@ -56,21 +56,22 @@ organization の共通値（`SERVER_*`）はこのリポジトリからは同期
 ### 3. サーバー側の準備
 
 本番のデプロイは VPS の app-deploy-gate（`guchi-apps/vps` の `scripts/app-deploy-gate.sh`）が行います（#197）。
-置き場は `/home/github-user/apps/solitaire`（gate のアプリ名 `solitaire`）で、公開するのはその下の `public/` です。
+置き場は `/home/github-user/apps/solitaire`（gate のアプリ名 `solitaire`）で、gate はその下の `public/` を公開先
+`/var/www/html/klondike.game.gucchii.com` へ同期します（公開先は `guchi-apps/vps` の `scripts/app-deploy-gate-static-roots` が決める。guchi-apps/vps#308）。
 
 1. 置き場を作る（`guchi-apps/vps` の provision-app、または `sudo -u github-user mkdir -p /home/github-user/apps/solitaire`）
 2. このアプリ専用のデプロイ鍵を作り、`guchi-apps/vps` の `scripts/setup-app-keys.sh add --app solitaire` で登録する
-3. Apache の DocumentRoot を `/home/github-user/apps/solitaire/public` にする（設定の正は `guchi-apps/vps`）。
-   `.htaccess`（`no-store`・dotfile の拒否）が効くよう `AllowOverride All` が要り、Apache（www-data）が
-   `/home/github-user`・`/home/github-user/apps` を辿れる必要がある（gate は置き場を 711・`public/` を 755/644 にする）
+3. Apache の DocumentRoot は `/var/www/html/klondike.game.gucchii.com` のまま（設定の正は `guchi-apps/vps`）。
+   置き場（`/home/github-user` 配下）は Apache へ開かない。公開先は `github-user` が書ける必要があり、
+   `.htaccess`（`no-store`・dotfile の拒否）が効くよう `AllowOverride All` が要る（gate は公開先を 755/644 にする）
 
 **本番:** サブドメイン直下に公開する（`https://klondike.game.gucchii.com/`）。
 
 ```apache
 <VirtualHost *:443>
   ServerName klondike.game.gucchii.com
-  DocumentRoot /home/github-user/apps/solitaire/public
-  <Directory /home/github-user/apps/solitaire/public>
+  DocumentRoot /var/www/html/klondike.game.gucchii.com
+  <Directory /var/www/html/klondike.game.gucchii.com>
     Options -Indexes
     AllowOverride All
     Require all granted
