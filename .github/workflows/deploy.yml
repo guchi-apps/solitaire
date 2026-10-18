@@ -74,19 +74,45 @@ jobs:
           cp index.html styles.css manifest.webmanifest sw.js dist/
           cp -r js assets dist/
           cp deploy/.htaccess dist/.htaccess
-          # 配信する版を外から確かめるための版情報（#193）。deploy ジョブの照合と、
-          # issue-deck の稼働確認（公開URLとして登録する）が読む。
+          # 配信する版を外から確かめるための版情報（#193）。gate の照合（public/version.json）、
+          # deploy ジョブの公開URLでの照合、issue-deck の稼働確認（公開URLとして登録する）が読む。
           node scripts/write-version-json.js dist "${{ github.sha }}"
           test -f dist/version.json
+          test -f dist/.htaccess
           test -f dist/assets/icon-192.png
           test -f dist/assets/icon-512.png
           test -f dist/assets/favicon-32.png
+
+      # **VPSのgate（/usr/local/sbin/app-deploy-gate。guchi-apps/vps#275・#305）へ渡す配布物**（#197）。
+      # 静的アプリの形: 公開する中身は public/、目印は deploy/gate-static。gate は置き場
+      # （/home/github-user/apps/solitaire）で public/ を入れ替え、依存・マイグレーション・pm2 を動かさない。
+      # それ以外（deploy/.htaccess の原本など）は入れない。gate はリンク・特殊ファイルを含む配布物を断るため、
+      # ここでも確かめる。隠しファイル（.htaccess）が入ることも確かめる（入らないと no-store・dotfile の拒否が効かない）。
+      - name: Create deploy archive
+        run: |
+          set -euo pipefail
+          rm -rf bundle
+          mkdir -p bundle/deploy
+          cp -a dist bundle/public
+          cp deploy/gate-static bundle/deploy/gate-static
+          tar -C bundle -czf deploy.tar.gz public deploy/gate-static
+          # 一覧はファイルへ書いてから読む（grep -q が先に終わると tar が SIGPIPE で落ち、pipefail で失敗するため）。
+          tar -tvzf deploy.tar.gz > bundle.lst
+          if grep -vE '^[-d]' bundle.lst; then
+            echo "::error::配布物にリンクまたは特殊ファイルが含まれています"
+            exit 1
+          fi
+          tar -tzf deploy.tar.gz > bundle.names
+          for required in public/.htaccess public/version.json public/index.html deploy/gate-static; do
+            grep -qxF "$required" bundle.names || { echo "::error::配布物に ${required} がありません"; exit 1; }
+          done
+          cat bundle.names
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: deploy-bundle
-          path: dist/
+          path: deploy.tar.gz
           if-no-files-found: error
 
   deploy:
@@ -99,12 +125,12 @@ jobs:
     # SUPABASE_* はorganizationの共通値。
     #
     # このブロックは scripts/generate-workflow-env-block.sh で生成する（guchi-apps/issue-deck#1307）。
+    # SSH_PRIVATE_KEY はこのアプリ専用の鍵（#197）。DEPLOY_PATH は gate が置き場を固定するため使わない。
     env:
       SSH_HOST: ${{ secrets.SERVER_HOST }}
       SSH_PORT: ${{ secrets.SERVER_SSH_PORT }}
-      SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_PRIVATE_KEY }}
       SSH_USERNAME: ${{ secrets.SERVER_USERNAME }}
-      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
       SIGNALY_WEBHOOK_URL: ${{ secrets.SIGNALY_WEBHOOK_URL }}
 
     steps:
@@ -115,26 +141,51 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: deploy-bundle
-          path: dist/
+          path: ./
 
-      - name: Deploy to Server
-        uses: easingthemes/ssh-deploy@2cc5b27bf3029d0455dd5e09fe02633904031447 # v6.0.3
+      # 鍵はサードパーティのアクションを通さず、ランナーの ~/.ssh へ直接置く（#134 で
+      # SSH 秘密鍵を渡すアクションの参照を問題にしたため、新たなアクションを足さない）。
+      - name: Install SSH key
+        run: |
+          set -euo pipefail
+          [ -n "$SSH_PRIVATE_KEY" ] || { echo "::error::SSH_PRIVATE_KEY が未設定です（このアプリ専用の鍵を同期してください）"; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "Host ${SSH_HOST}" "  IdentityFile ~/.ssh/deploy_key" "  IdentitiesOnly yes" > ~/.ssh/config
+          chmod 600 ~/.ssh/config
+          ssh-keyscan -p "${SSH_PORT}" -H "${SSH_HOST}" >> ~/.ssh/known_hosts
+
+      # **VPSのgate（/usr/local/sbin/app-deploy-gate。guchi-apps/vps#275・#305）へ渡す**（#197）。
+      # 鍵はこのアプリ専用で、VPSのauthorized_keysのcommand=がgateのアプリ名 solitaire
+      # （置き場 /home/github-user/apps/solitaire）を固定する。任意のシェルコマンドは実行できず、
+      # upload・env・deploy の3語だけが通る。配布物に deploy/gate-static があるので、gate は
+      # 前回配布物の削除 → public/ の展開 → 権限の調整（置き場 711・public 755/644）→
+      # public/version.json の sha と .env の APP_COMMIT_SHA の照合までを行い、依存・pm2 は動かさない。
+      # 公開されるのは /home/github-user/apps/solitaire/public（ApacheのDocumentRootは guchi-apps/vps 側）。
+      - name: Upload archive
+        run: ssh -p "${SSH_PORT}" "${SSH_USERNAME}@${SSH_HOST}" upload < deploy.tar.gz
+
+      - name: Send environment variables
         env:
-          SSH_PRIVATE_KEY: ${{ env.SSH_PRIVATE_KEY }}
-          ARGS: "-rlDzvc -i --delete"
-          SOURCE: "dist/"
-          REMOTE_HOST: ${{ env.SSH_HOST }}
-          REMOTE_USER: ${{ env.SSH_USERNAME }}
-          TARGET: ${{ env.DEPLOY_PATH }}
-          REMOTE_PORT: ${{ env.SSH_PORT }}
+          # 配信する版の照合に使う（guchi-apps/issue-deck#4712）。gate が .env の APP_COMMIT_SHA と
+          # public/version.json の sha を照合する（guchi-apps/vps#305）。コミットのSHAは公開情報。
+          # 静的アプリは PORT を持たない（gate-static では不要）。
+          APP_COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          case "$APP_COMMIT_SHA" in
+            *$'\n'*) echo "::error::APP_COMMIT_SHA が改行を含むためgateへ送れません"; exit 1 ;;
+          esac
+          {
+            printf '%s\n' "APP_COMMIT_SHA=${APP_COMMIT_SHA}"
+          } | ssh -p "${SSH_PORT}" "${SSH_USERNAME}@${SSH_HOST}" env
 
-      # rsync は --delete 付きのため、DEPLOY_PATH の設定ミスやビルド成果物の
-      # 取りこぼしで公開ディレクトリを空にしてしまう事故が起こり得る。転送が
-      # 終わっただけでは緑にせず、公開URLの応答と中身まで確認する（#81）。
-      #
-      # deploy ジョブには SSH セッションが無い（easingthemes/ssh-deploy が内部で
-      # rsync するだけ）ので、ランナーから公開HTTPSを叩く。経路に Apache と TLS が
-      # 含まれるため vhost の破損も一緒に検知できる。
+      - name: Deploy
+        run: ssh -p "${SSH_PORT}" "${SSH_USERNAME}@${SSH_HOST}" deploy
+
+      # gate の照合は置き場のファイルまで。ApacheのDocumentRoot・vhost・TLS の破損は見えないので、
+      # 公開URLの応答と中身もランナーから確かめる（#81）。
       #
       # 標準（guchi-apps/docs の standards/ci-deploy.md）は 2秒間隔・最大60秒だが、
       # solitaire は静的サイトで再起動するプロセスが無く起動待ちが存在しない。
@@ -163,10 +214,10 @@ jobs:
           echo "::error::Health check failed for ${HEALTH_CHECK_URL} after 5 attempts."
           exit 1
 
-      # 応答が返るだけでは、新しい版が配信されているとは限らない（rsync の取りこぼし・
-      # キャッシュ）。公開URLの version.json の sha がこの実行のコミットと一致するまで
-      # 成功にしない（#193）。version.json は .htaccess で no-store・Service Worker の対象外に
-      # してあるが、経路上のキャッシュに備えて毎回クエリを変えて取りにいく。
+      # 置き場のファイルが新しくても、Apache が別のディレクトリを配信していれば公開URLは古いまま
+      # （DocumentRoot の移し忘れ・経路上のキャッシュ）。公開URLの version.json の sha がこの実行の
+      # コミットと一致するまで成功にしない（#193）。version.json は .htaccess で no-store・
+      # Service Worker の対象外にしてあるが、経路上のキャッシュに備えて毎回クエリを変えて取りにいく。
       - name: Verify deployed version
         env:
           VERSION_CHECK_URL: https://klondike.game.gucchii.com/version.json

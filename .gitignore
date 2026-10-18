@@ -8,3 +8,7 @@ dist/
 # claude-issue-dispatch.yml が無人実行のたびにcheckoutする（リポジトリ管理外）
 /.shared-context/
 /.shared-prompts/
+bundle/
+deploy.tar.gz
+bundle.lst
+bundle.names
