@@ -93,7 +93,8 @@ Alias /solitaire /var/www/html/solitaire
 2. `npm run build` でバージョンを各ファイルに同期し、静的ファイルをビルド
 3. rsync でサーバーの `DEPLOY_PATH` へ転送（`--delete` で古いファイルを削除）
 4. 公開URL <https://klondike.game.gucchii.com/> へヘルスチェック（2秒間隔・最大5回）
-5. **デプロイ成功後のみ** GitHub Release を作成
+5. 公開URL <https://klondike.game.gucchii.com/version.json> の `sha` がデプロイしたコミットと一致するまで確認（5秒間隔・最大120秒。一致しなければ失敗）
+6. **デプロイ成功後のみ** GitHub Release を作成
 
 ヘルスチェックは `deploy` ジョブに SSH セッションが無いため、GitHub Actions のランナーから
 公開HTTPS を叩きます。経路に Apache と TLS を含むので vhost の破損も検知できます。
@@ -101,6 +102,10 @@ Alias /solitaire /var/www/html/solitaire
 確認します。`--delete` 付き rsync で公開ディレクトリを空にしてしまう事故を、200 応答だけでは
 拾えないためです。静的サイトで起動待ちが無いため、標準の「2秒間隔・最大60秒」ではなく
 Apache reload の瞬断を吸収できる長さ（10秒）にしています。
+
+`version.json`（`{ "version": "<package.jsonの版>", "sha": "<コミットSHA>" }`）はビルド時に
+`scripts/write-version-json.js` が書き出します（#193）。`.htaccess` で `no-store`、Service Worker の
+対象外にしてあり、デプロイの照合と issue-deck の稼働確認（公開URLとして登録）が読みます。
 
 手動でタグを push した場合は `.github/workflows/release.yml` が GitHub Release を作成します（`deploy.yml` 経由のタグ push は GITHUB_TOKEN のため別 workflow は起動しません）。
 

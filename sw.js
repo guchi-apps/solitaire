@@ -1,12 +1,12 @@
-const CACHE_VERSION = '1.6.25';
+const CACHE_VERSION = '1.6.26';
 const CACHE_NAME = `solitaire-${CACHE_VERSION}`;
 
 const PRECACHE_URLS = [
   './',
   './index.html',
-  './styles.css?v=1.6.25',
+  './styles.css?v=1.6.26',
   './manifest.webmanifest',
-  './js/game.js?v=1.6.25',
+  './js/game.js?v=1.6.26',
   './js/app-update.js',
   './js/changelog.js',
   './js/deal-quality.js',
@@ -33,6 +33,12 @@ function isCacheableAsset(request) {
   const { pathname } = new URL(request.url);
   return /\.(html|css|js|png|ico|svg|webmanifest)$/.test(pathname)
     || pathname.endsWith('/');
+}
+
+// 配信中の版を照合するためのファイル（#193）。保存すると、デプロイ後も古い版の sha を
+// 返し続けるため、Service Worker では一切扱わずブラウザ（と no-store の応答ヘッダー）に任せる。
+function isVersionInfo(request) {
+  return new URL(request.url).pathname.endsWith('/version.json');
 }
 
 function isJavaScriptModule(request) {
@@ -108,6 +114,7 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
   if (!isSameOrigin(request)) return;
+  if (isVersionInfo(request)) return;
 
   if (request.cache === 'no-store') {
     event.respondWith(fetch(request));
