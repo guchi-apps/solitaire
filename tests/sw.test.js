@@ -48,4 +48,11 @@ describe('service worker offline cache', () => {
     assert.doesNotMatch(swSource, /ignoreSearch:\s*true/);
     assert.match(swSource, /request\.cache === 'no-store'/);
   });
+
+  it('never caches version.json (deployed version check, #193)', () => {
+    assert.match(swSource, /if \(isVersionInfo\(request\)\) return;/);
+    assert.doesNotMatch(swSource, /'\.\/version\.json'/);
+    const isCacheable = /function isCacheableAsset[\s\S]*?\n\}/.exec(swSource)[0];
+    assert.doesNotMatch(isCacheable, /json/);
+  });
 });

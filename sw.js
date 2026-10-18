@@ -35,6 +35,12 @@ function isCacheableAsset(request) {
     || pathname.endsWith('/');
 }
 
+// 配信中の版を照合するためのファイル（#193）。保存すると、デプロイ後も古い版の sha を
+// 返し続けるため、Service Worker では一切扱わずブラウザ（と no-store の応答ヘッダー）に任せる。
+function isVersionInfo(request) {
+  return new URL(request.url).pathname.endsWith('/version.json');
+}
+
 function isJavaScriptModule(request) {
   const { pathname } = new URL(request.url);
   return pathname.endsWith('.js');
@@ -108,6 +114,7 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
   if (!isSameOrigin(request)) return;
+  if (isVersionInfo(request)) return;
 
   if (request.cache === 'no-store') {
     event.respondWith(fetch(request));
