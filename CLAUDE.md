@@ -27,6 +27,19 @@ CI（`.github/workflows/ci.yml`）は Node `'20'` で `npm test` → `npm run bu
 **新しいテストは `tests/` に置き、`node --test` で動く形（`node:test` / `node:assert`）で書く。**
 テストフレームワークを追加したくなった場合は、下記「依存関係の追加」に従うこと。
 
+## 本番デプロイ（app-deploy-gate の静的アプリ）
+
+`main` への push で `deploy.yml` が動き、VPS の app-deploy-gate（`guchi-apps/vps` の `scripts/app-deploy-gate.sh`。#197）へ
+**このアプリ専用の鍵**（`SSH_PRIVATE_KEY`＝`op://apps/solitaire/deploy-ssh-key`）で `upload` → `env` → `deploy` の3語だけを送る。
+organization 共通の `SERVER_SSH_PRIVATE_KEY` と rsync（`easingthemes/ssh-deploy`）はもう使わない。
+
+- **gate のアプリ名は `solitaire`。** 置き場は `/home/github-user/apps/solitaire` 固定で、公開されるのは `public/`。`DEPLOY_PATH` は使わない
+- **配布物は `public/`（従来の dist の中身。`.htaccess`・`version.json` を含む）と `deploy/gate-static` だけ。** `deploy/gate-static` が
+  静的アプリの目印で、gate は依存・マイグレーション・pm2 を動かさず、権限を整えて `public/version.json` の `sha` を `.env` の
+  `APP_COMMIT_SHA` と照合する。`deploy/gate-static` を消すと gate が `PORT` を要求して失敗する
+- **gate へ送る変数は `APP_COMMIT_SHA` だけ**（静的アプリは `PORT` 不要）。gate の外の処理は SSH 先で動かせない
+- 公開URLのヘルスチェックと `version.json` の照合はランナー側に残す（gate は Apache がどこを配信しているかを見ないため）
+
 ## リリース時の更新履歴（`RELEASE_CHANGELOG`）
 
 リリース自動化ワークフローは `npm version` の `"version"` lifecycle スクリプト
