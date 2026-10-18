@@ -2,8 +2,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 // 配信する版を外から確かめるための dist/version.json を書き出す（#193）。
-// solitaire は rsync で配置する静的サイトでサーバー側の処理が無いため、ビルド時に
-// 版情報のファイルを作って一緒に配信し、デプロイ後にその sha を照合する。
+// solitaire はサーバー側の処理が無い静的サイトのため、ビルド時に版情報のファイルを作って
+// 一緒に配信し、デプロイ時にその sha を照合する（app-deploy-gate が置き場の public/version.json を、
+// deploy.yml が公開URLの version.json を見る。#197）。
 //
 // 使い方: node scripts/write-version-json.js <出力ディレクトリ> <commit sha>
 // sha を省略すると GITHUB_SHA を使う。どちらも無ければ失敗させる（空の sha を配信すると

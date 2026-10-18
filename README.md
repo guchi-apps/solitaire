@@ -25,8 +25,8 @@ SSH 接続情報（`SERVER_*`）は organization の共通値を継承します�
 | `SERVER_HOST` | organization | デプロイ先サーバーのホスト名または IP |
 | `SERVER_USERNAME` | organization | SSH 接続ユーザー名 |
 | `SERVER_SSH_PORT` | organization | SSH ポート番号（例: `22`） |
-| `SERVER_SSH_PRIVATE_KEY` | organization | SSH 秘密鍵（デプロイ用・他アプリと共通） |
-| `DEPLOY_PATH` | repository | 静的ファイルの配置先（例: `/var/www/html/solitaire`） |
+| `SSH_PRIVATE_KEY` | repository | このアプリ専用のデプロイ鍵（1Password `op://apps/solitaire/deploy-ssh-key`）。VPS の `authorized_keys` の `command=` で app-deploy-gate（アプリ名 `solitaire`）に固定され、任意のコマンドは実行できない |
+| `DEPLOY_PATH` | repository | **使わなくなった**（#197。gate が置き場を `/home/github-user/apps/solitaire` に固定する）。移行を確かめてから撤去する |
 | `SIGNALY_WEBHOOK_URL` | repository | CI / デプロイ通知用 Signaly Webhook URL |
 | `OP_SERVICE_ACCOUNT_TOKEN` | repository | 1Password Service Account のトークン（`apps` ボールトへの読み取り権限）。**下記の同期でのみ使い、デプロイでは使いません** |
 
@@ -55,16 +55,23 @@ organization の共通値（`SERVER_*`）はこのリポジトリからは同期
 
 ### 3. サーバー側の準備
 
-1. `DEPLOY_PATH` のディレクトリを作成し、Web サーバーから読み取り可能にする
-2. Apache の場合、`DEPLOY_PATH` を DocumentRoot または Alias で公開する
+本番のデプロイは VPS の app-deploy-gate（`guchi-apps/vps` の `scripts/app-deploy-gate.sh`）が行います（#197）。
+置き場は `/home/github-user/apps/solitaire`（gate のアプリ名 `solitaire`）で、gate はその下の `public/` を公開先
+`/var/www/html/klondike.game.gucchii.com` へ同期します（公開先は `guchi-apps/vps` の `scripts/app-deploy-gate-static-roots` が決める。guchi-apps/vps#308）。
 
-**本番（推奨）:** サブドメイン直下に公開する場合（例: `https://klondike.game.gucchii.com/`）、`DEPLOY_PATH` をその VirtualHost の DocumentRoot に設定します。
+1. 置き場を作る（`guchi-apps/vps` の provision-app、または `sudo -u github-user mkdir -p /home/github-user/apps/solitaire`）
+2. このアプリ専用のデプロイ鍵を作り、`guchi-apps/vps` の `scripts/setup-app-keys.sh add --app solitaire` で登録する
+3. Apache の DocumentRoot は `/var/www/html/klondike.game.gucchii.com` のまま（設定の正は `guchi-apps/vps`）。
+   置き場（`/home/github-user` 配下）は Apache へ開かない。公開先は `github-user` が書ける必要があり、
+   `.htaccess`（`no-store`・dotfile の拒否）が効くよう `AllowOverride All` が要る（gate は公開先を 755/644 にする）
+
+**本番:** サブドメイン直下に公開する（`https://klondike.game.gucchii.com/`）。
 
 ```apache
 <VirtualHost *:443>
   ServerName klondike.game.gucchii.com
-  DocumentRoot /var/www/klondike.game.gucchii.com
-  <Directory /var/www/klondike.game.gucchii.com>
+  DocumentRoot /var/www/html/klondike.game.gucchii.com
+  <Directory /var/www/html/klondike.game.gucchii.com>
     Options -Indexes
     AllowOverride All
     Require all granted
@@ -91,16 +98,17 @@ Alias /solitaire /var/www/html/solitaire
 
 1. `package.json` のバージョンから Git タグ（`v*`）を作成
 2. `npm run build` でバージョンを各ファイルに同期し、静的ファイルをビルド
-3. rsync でサーバーの `DEPLOY_PATH` へ転送（`--delete` で古いファイルを削除）
+3. 配布物（`public/` と `deploy/gate-static` だけの `deploy.tar.gz`）を作り、このアプリ専用の鍵で VPS の app-deploy-gate へ
+   `upload` → `env`（`APP_COMMIT_SHA` だけ）→ `deploy` の3語を送る。gate は前回の配布物を消して `public/` を展開し、
+   権限を整え、`public/version.json` の `sha` が `APP_COMMIT_SHA` と一致しなければ失敗にする（静的アプリなので依存・プロセスは無い）
 4. 公開URL <https://klondike.game.gucchii.com/> へヘルスチェック（2秒間隔・最大5回）
 5. 公開URL <https://klondike.game.gucchii.com/version.json> の `sha` がデプロイしたコミットと一致するまで確認（5秒間隔・最大120秒。一致しなければ失敗）
 6. **デプロイ成功後のみ** GitHub Release を作成
 
-ヘルスチェックは `deploy` ジョブに SSH セッションが無いため、GitHub Actions のランナーから
-公開HTTPS を叩きます。経路に Apache と TLS を含むので vhost の破損も検知できます。
+gate の照合は置き場のファイルまでで、Apache がどのディレクトリを配信しているかは見えません。そのため
+ヘルスチェックは GitHub Actions のランナーから公開HTTPS を叩きます。経路に Apache と TLS を含むので vhost の破損も検知できます。
 200 が返るだけでなく `index.html` のルート要素（`<div id="app"`）が本文に含まれることまで
-確認します。`--delete` 付き rsync で公開ディレクトリを空にしてしまう事故を、200 応答だけでは
-拾えないためです。静的サイトで起動待ちが無いため、標準の「2秒間隔・最大60秒」ではなく
+確認します。空のディレクトリを配信してしまう事故を、200 応答だけでは拾えないためです。静的サイトで起動待ちが無いため、標準の「2秒間隔・最大60秒」ではなく
 Apache reload の瞬断を吸収できる長さ（10秒）にしています。
 
 `version.json`（`{ "version": "<package.jsonの版>", "sha": "<コミットSHA>" }`）はビルド時に

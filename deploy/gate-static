@@ -1,0 +1,4 @@
+# app-deploy-gate の静的アプリの目印（guchi-apps/vps#305・solitaire#197）。
+# 配布物にこのファイルがあると、gate は依存のインストール・マイグレーション・pm2 を動かさず、
+# 置き場（/home/github-user/apps/solitaire）を 711、public/ を 755/644 にし、
+# .env の APP_COMMIT_SHA と public/version.json の sha を照合する。中身は読まれない。
