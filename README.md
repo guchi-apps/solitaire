@@ -26,8 +26,6 @@ SSH 接続情報（`SERVER_*`）は organization の共通値を継承します�
 | `SERVER_USERNAME` | organization | SSH 接続ユーザー名 |
 | `SERVER_SSH_PORT` | organization | SSH ポート番号（例: `22`） |
 | `SSH_PRIVATE_KEY` | repository | このアプリ専用のデプロイ鍵（1Password `op://apps/solitaire/deploy-ssh-key`）。VPS の `authorized_keys` の `command=` で app-deploy-gate（アプリ名 `solitaire`）に固定され、任意のコマンドは実行できない |
-| `DEPLOY_PATH` | repository | **使わなくなった**（#197。gate が置き場を `/home/github-user/apps/solitaire` に固定する）。移行を確かめてから撤去する |
-| `SIGNALY_WEBHOOK_URL` | repository | CI / デプロイ通知用 Signaly Webhook URL |
 | `OP_SERVICE_ACCOUNT_TOKEN` | repository | 1Password Service Account のトークン（`apps` ボールトへの読み取り権限）。**下記の同期でのみ使い、デプロイでは使いません** |
 
 ワークフローの `env:` ブロックは `scripts/generate-workflow-env-block.sh` で生成できます。
@@ -45,13 +43,8 @@ scripts/sync-github-secrets.sh             # 実際に同期
 organization の共通値（`SERVER_*`）はこのリポジトリからは同期しません（マニフェスト上は `inherit`）。issue-deck の画面のボタン（`.github/workflows/sync-secrets.yml`）からも同期を起こせます。
 
 > `sync-secrets.yml` は本体を issue-deck の `reusable-sync-secrets.yml` に置き、`secrets: inherit` で丸ごと渡しています。そのため `.github/` を `OP_SERVICE_ACCOUNT_TOKEN` で grep してもヒットしません。**使われていないと判断して消さないでください**（消すと同期が動かなくなります）。
-
 `main` ブランチへのプッシュで、ビルド → SSH デプロイが自動実行されます。
 
-**CI / デプロイ通知:** Signaly へ通知します（`.github/scripts/signaly-notify.sh`）。
-
-- **CI:** `develop` への push は失敗時のみ、`main` 向け PR は成功・失敗・キャンセルを通知
-- **デプロイ / リリース:** `main` への push 後に結果を通知
 
 ### 3. サーバー側の準備
 
