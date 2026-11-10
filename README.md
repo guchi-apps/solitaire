@@ -16,6 +16,7 @@ npm run dev
 リポジトリ（コード・テスト・`npm run build`）は残してあり、`npm run dev` でローカルで動かせます。
 
 - `main` へ push しても本番デプロイは行いません（`deploy.yml` はタグ作成と GitHub Release のみ）
+- 公開停止中は `version.json`（`scripts/write-version-json.js`）を誰も使いませんが、再公開用に残してあります
 - デプロイ用の `deploy/`・`deploy-retry.yml`・専用デプロイ鍵（`SSH_PRIVATE_KEY`）は撤去済みです
 - サーバー側（公開先 `/var/www/html/klondike.game.gucchii.com`・置き場 `/home/github-user/apps/solitaire`・Apache の vhost・
   authorized_keys の鍵・DNS）の撤去は `guchi-apps/vps` 側の作業です
