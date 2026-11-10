@@ -12,7 +12,7 @@ npm run dev
 
 ## 公開停止中
 
-**このアプリは公開を停止しています（#214）。** `https://klondike.game.gucchii.com/` では配信していません。
+**このアプリは公開を停止しています（#214）。** `https://klondike.game.gucchii.com/` での配信を止める方針です（VPS側の撤去が済むまで旧サイトは残ります）。
 リポジトリ（コード・テスト・`npm run build`）は残してあり、`npm run dev` でローカルで動かせます。
 
 - `main` へ push しても本番デプロイは行いません（`deploy.yml` はタグ作成と GitHub Release のみ）
