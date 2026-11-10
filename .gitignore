@@ -9,6 +9,5 @@ dist/
 /.shared-context/
 /.shared-prompts/
 bundle/
-deploy.tar.gz
 bundle.lst
 bundle.names
