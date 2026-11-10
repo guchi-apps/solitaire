@@ -12,14 +12,15 @@ npm run dev
 
 ## 公開停止中
 
-**このアプリは公開を停止しています（#214）。** `https://klondike.game.gucchii.com/` では配信していません。
+**このアプリは公開を停止しています（#214）。** `https://klondike.game.gucchii.com/` での配信を止める方針です（VPS側の撤去が済むまで旧サイトは残ります）。
 リポジトリ（コード・テスト・`npm run build`）は残してあり、`npm run dev` でローカルで動かせます。
 
 - `main` へ push しても本番デプロイは行いません（`deploy.yml` はタグ作成と GitHub Release のみ）
 - 公開停止中は `version.json`（`scripts/write-version-json.js`）を誰も使いませんが、再公開用に残してあります
 - デプロイ用の `deploy/`・`deploy-retry.yml`・専用デプロイ鍵（`SSH_PRIVATE_KEY`）は撤去済みです
 - サーバー側（公開先 `/var/www/html/klondike.game.gucchii.com`・置き場 `/home/github-user/apps/solitaire`・Apache の vhost・
-  authorized_keys の鍵・DNS）の撤去は `guchi-apps/vps` 側の作業です
+  authorized_keys の鍵・DNS）の撤去は `guchi-apps/vps` 側の作業です（追跡: guchi-apps/vps#337、確認手順: [docs/takedown.md](docs/takedown.md)）。
+  **撤去が済むまで旧サイトは配信され続けます**
 - 再公開する場合は、撤去前の `deploy.yml`・`deploy/`・`.github/secrets-manifest.tsv` を履歴（#214 より前）から戻します
 
 ## GitHub secret の同期
