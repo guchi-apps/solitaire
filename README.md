@@ -10,109 +10,32 @@ npm run dev
 
 ブラウザで [http://localhost:8080](http://localhost:8080) を開いて確認できます。
 
-## デプロイに使う値（GitHub secret / variable）
+## 公開停止中
 
-ワークフローは実行時に **GitHub の secret / variable** から値を取ります（`op://` の実行時参照は行いません）。以前は実行のたびに 1Password から読んでいましたが、1Password サービスアカウントの日次レート制限（1Password アカウント全体で 1,000 リクエスト/日。サービスアカウントを分けても分割されません）を使い切り、フリート全体のデプロイが止まったためです（guchi-apps/issue-deck#1302）。
+**このアプリは公開を停止しています（#214）。** `https://klondike.game.gucchii.com/` では配信していません。
+リポジトリ（コード・テスト・`npm run build`）は残してあり、`npm run dev` でローカルで動かせます。
 
-どの値を GitHub 側のどこへ置くかの対応表は `.github/secrets-manifest.tsv` です。
+- `main` へ push しても本番デプロイは行いません（`deploy.yml` はタグ作成と GitHub Release のみ）
+- 公開停止中は `version.json`（`scripts/write-version-json.js`）を誰も使いませんが、再公開用に残してあります
+- デプロイ用の `deploy/`・`deploy-retry.yml`・専用デプロイ鍵（`SSH_PRIVATE_KEY`）は撤去済みです
+- サーバー側（公開先 `/var/www/html/klondike.game.gucchii.com`・置き場 `/home/github-user/apps/solitaire`・Apache の vhost・
+  authorized_keys の鍵・DNS）の撤去は `guchi-apps/vps` 側の作業です
+- 再公開する場合は、撤去前の `deploy.yml`・`deploy/`・`.github/secrets-manifest.tsv` を履歴（#214 より前）から戻します
 
-### 1. GitHub 側に置く値
+## GitHub secret の同期
 
-SSH 接続情報（`SERVER_*`）は organization の共通値を継承します。このリポジトリ固有の値だけ repository の secret に置きます。
+どの値を GitHub 側のどこへ置くかの対応表は `.github/secrets-manifest.tsv` です（現在は organization 共通値のみ）。
 
-| GitHub 側の名前 | スコープ | 説明 |
-| :--- | :--- | :--- |
-| `SERVER_HOST` | organization | デプロイ先サーバーのホスト名または IP |
-| `SERVER_USERNAME` | organization | SSH 接続ユーザー名 |
-| `SERVER_SSH_PORT` | organization | SSH ポート番号（例: `22`） |
-| `SSH_PRIVATE_KEY` | repository | このアプリ専用のデプロイ鍵（1Password `op://apps/solitaire/deploy-ssh-key`）。VPS の `authorized_keys` の `command=` で app-deploy-gate（アプリ名 `solitaire`）に固定され、任意のコマンドは実行できない |
-| `OP_SERVICE_ACCOUNT_TOKEN` | repository | 1Password Service Account のトークン（`apps` ボールトへの読み取り権限）。**下記の同期でのみ使い、デプロイでは使いません** |
+> `sync-secrets.yml` は本体を issue-deck の `reusable-sync-secrets.yml` に置き、`secrets: inherit` で丸ごと渡しています。**使われていないと判断して消さないでください**。
 
-ワークフローの `env:` ブロックは `scripts/generate-workflow-env-block.sh` で生成できます。
+## タグと Release
 
-### 2. 値を変えたときの同期（1Password が唯一の正）
-
-1Password（`apps` ボールトの `solitaire` アイテムほか）は「人が管理する唯一の正」として残します。値を変えたときだけ次を実行して GitHub 側へ同期してください。ここで使う `op` は**個人アカウントのセッション**のため、サービスアカウントの日次レート制限を消費しません。
-
-```bash
-op signin                                  # 個人アカウントでサインイン
-scripts/sync-github-secrets.sh --dry-run   # 差分だけ確認
-scripts/sync-github-secrets.sh             # 実際に同期
-```
-
-organization の共通値（`SERVER_*`）はこのリポジトリからは同期しません（マニフェスト上は `inherit`）。issue-deck の画面のボタン（`.github/workflows/sync-secrets.yml`）からも同期を起こせます。
-
-> `sync-secrets.yml` は本体を issue-deck の `reusable-sync-secrets.yml` に置き、`secrets: inherit` で丸ごと渡しています。そのため `.github/` を `OP_SERVICE_ACCOUNT_TOKEN` で grep してもヒットしません。**使われていないと判断して消さないでください**（消すと同期が動かなくなります）。
-`main` ブランチへのプッシュで、ビルド → SSH デプロイが自動実行されます。
-
-
-### 3. サーバー側の準備
-
-本番のデプロイは VPS の app-deploy-gate（`guchi-apps/vps` の `scripts/app-deploy-gate.sh`）が行います（#197）。
-置き場は `/home/github-user/apps/solitaire`（gate のアプリ名 `solitaire`）で、gate はその下の `public/` を公開先
-`/var/www/html/klondike.game.gucchii.com` へ同期します（公開先は `guchi-apps/vps` の `scripts/app-deploy-gate-static-roots` が決める。guchi-apps/vps#308）。
-
-1. 置き場を作る（`guchi-apps/vps` の provision-app、または `sudo -u github-user mkdir -p /home/github-user/apps/solitaire`）
-2. このアプリ専用のデプロイ鍵を作り、`guchi-apps/vps` の `scripts/setup-app-keys.sh add --app solitaire` で登録する
-3. Apache の DocumentRoot は `/var/www/html/klondike.game.gucchii.com` のまま（設定の正は `guchi-apps/vps`）。
-   置き場（`/home/github-user` 配下）は Apache へ開かない。公開先は `github-user` が書ける必要があり、
-   `.htaccess`（`no-store`・dotfile の拒否）が効くよう `AllowOverride All` が要る（gate は公開先を 755/644 にする）
-
-**本番:** サブドメイン直下に公開する（`https://klondike.game.gucchii.com/`）。
-
-```apache
-<VirtualHost *:443>
-  ServerName klondike.game.gucchii.com
-  DocumentRoot /var/www/html/klondike.game.gucchii.com
-  <Directory /var/www/html/klondike.game.gucchii.com>
-    Options -Indexes
-    AllowOverride All
-    Require all granted
-  </Directory>
-</VirtualHost>
-```
-
-**別パターン:** 既存サイトのサブパス（例: `/solitaire/`）で公開する場合:
-
-```apache
-Alias /solitaire /var/www/html/solitaire
-<Directory /var/www/html/solitaire>
-  Options -Indexes
-  AllowOverride All
-  Require all granted
-</Directory>
-```
-
-**注意:** サーバー側で `/icons` に Alias 等が設定されていると、アイコンだけ 404 になることがあります（`js/` や `styles.css` は正常）。本リポジトリではアイコンを `assets/` に配置しています。
-
-## デプロイの流れ
-
-`main` ブランチへの push で GitHub Actions が次を実行します。
-
-1. `package.json` のバージョンから Git タグ（`v*`）を作成
-2. `npm run build` でバージョンを各ファイルに同期し、静的ファイルをビルド
-3. 配布物（`public/` と `deploy/gate-static` だけの `deploy.tar.gz`）を作り、このアプリ専用の鍵で VPS の app-deploy-gate へ
-   `upload` → `env`（`APP_COMMIT_SHA` だけ）→ `deploy` の3語を送る。gate は前回の配布物を消して `public/` を展開し、
-   権限を整え、`public/version.json` の `sha` が `APP_COMMIT_SHA` と一致しなければ失敗にする（静的アプリなので依存・プロセスは無い）
-4. 公開URL <https://klondike.game.gucchii.com/> へヘルスチェック（2秒間隔・最大5回）
-5. 公開URL <https://klondike.game.gucchii.com/version.json> の `sha` がデプロイしたコミットと一致するまで確認（5秒間隔・最大120秒。一致しなければ失敗）
-6. **デプロイ成功後のみ** GitHub Release を作成
-
-gate の照合は置き場のファイルまでで、Apache がどのディレクトリを配信しているかは見えません。そのため
-ヘルスチェックは GitHub Actions のランナーから公開HTTPS を叩きます。経路に Apache と TLS を含むので vhost の破損も検知できます。
-200 が返るだけでなく `index.html` のルート要素（`<div id="app"`）が本文に含まれることまで
-確認します。空のディレクトリを配信してしまう事故を、200 応答だけでは拾えないためです。静的サイトで起動待ちが無いため、標準の「2秒間隔・最大60秒」ではなく
-Apache reload の瞬断を吸収できる長さ（10秒）にしています。
-
-`version.json`（`{ "version": "<package.jsonの版>", "sha": "<コミットSHA>" }`）はビルド時に
-`scripts/write-version-json.js` が書き出します（#193）。`.htaccess` で `no-store`、Service Worker の
-対象外にしてあり、デプロイの照合と issue-deck の稼働確認（公開URLとして登録）が読みます。
-
-手動でタグを push した場合は `.github/workflows/release.yml` が GitHub Release を作成します（`deploy.yml` 経由のタグ push は GITHUB_TOKEN のため別 workflow は起動しません）。
+`main` ブランチへの push で GitHub Actions が `package.json` のバージョンから Git タグ（`v*`）を作成し、GitHub Release を作ります。
+本番へのデプロイは行いません。手動でタグを push した場合は `.github/workflows/release.yml` が GitHub Release を作成します（`deploy.yml` 経由のタグ push は GITHUB_TOKEN のため別 workflow は起動しません）。
 
 ## リリース手順
 
-`develop` でバージョンを上げてから `main` にマージします。タグは CI が `main` 上で付けるため、ローカルでは **`--no-git-tag-version`** を付けて `package.json` だけ更新してください（ローカルでタグを作ると、マージ後のデプロイが「タグが既に別コミットを指している」として失敗します）。
+`develop` でバージョンを上げてから `main` にマージします。タグは CI が `main` 上で付けるため、ローカルでは **`--no-git-tag-version`** を付けて `package.json` だけ更新してください（ローカルでタグを作ると、マージ後のタグ作成が「タグが既に別コミットを指している」として失敗します）。
 
 ```bash
 git checkout develop

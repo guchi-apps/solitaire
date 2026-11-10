@@ -27,18 +27,14 @@ CI（`.github/workflows/ci.yml`）は Node `'20'` で `npm test` → `npm run bu
 **新しいテストは `tests/` に置き、`node --test` で動く形（`node:test` / `node:assert`）で書く。**
 テストフレームワークを追加したくなった場合は、下記「依存関係の追加」に従うこと。
 
-## 本番デプロイ（app-deploy-gate の静的アプリ）
+## 本番デプロイ（公開停止中。#214）
 
-`main` への push で `deploy.yml` が動き、VPS の app-deploy-gate（`guchi-apps/vps` の `scripts/app-deploy-gate.sh`。#197）へ
-**このアプリ専用の鍵**（`SSH_PRIVATE_KEY`＝`op://apps/solitaire/deploy-ssh-key`）で `upload` → `env` → `deploy` の3語だけを送る。
-organization 共通の `SERVER_SSH_PRIVATE_KEY` と rsync（`easingthemes/ssh-deploy`）はもう使わない。
+**このアプリは公開を停止している。** `main` への push で動く `deploy.yml` は**タグ作成と GitHub Release だけ**で、VPS へは何も送らない。
+`deploy/`・`deploy-retry.yml`・専用デプロイ鍵（`SSH_PRIVATE_KEY`）は撤去済み。サーバー側（公開先・置き場・vhost・authorized_keys・DNS）の撤去は `guchi-apps/vps` の管轄。
 
-- **gate のアプリ名は `solitaire`。** 置き場は `/home/github-user/apps/solitaire` 固定で、gate は `public/` を公開先 `/var/www/html/klondike.game.gucchii.com`（vps の `scripts/app-deploy-gate-static-roots` が決める。vps#308）へ同期する。DocumentRoot を置き場へ向けない（`/home/github-user` は Apache に開かない）。`DEPLOY_PATH` は使わない
-- **配布物は `public/`（従来の dist の中身。`.htaccess`・`version.json` を含む）と `deploy/gate-static` だけ。** `deploy/gate-static` が
-  静的アプリの目印で、gate は依存・マイグレーション・pm2 を動かさず、公開先へ同期して公開先の `version.json` の `sha` を `.env` の
-  `APP_COMMIT_SHA` と照合する。`deploy/gate-static` を消すと gate が `PORT` を要求して失敗する
-- **gate へ送る変数は `APP_COMMIT_SHA` だけ**（静的アプリは `PORT` 不要）。gate の外の処理は SSH 先で動かせない
-- 公開URLのヘルスチェックと `version.json` の照合はランナー側に残す（gate は Apache がどこを配信しているかを見ないため）
+- **デプロイ処理を勝手に復活させない。** 再公開はユーザーの指示があったときだけで、撤去前の `deploy.yml`・`deploy/`・`.github/secrets-manifest.tsv` を #214 より前の履歴から戻す
+- `scripts/write-version-json.js`・`tests/write-version-json.test.js`・`sw.js` の `version.json` 除外は残してある。公開停止中は `version.json` を誰も使わない（再公開時に使う）
+
 
 ## リリース時の更新履歴（`RELEASE_CHANGELOG`）
 

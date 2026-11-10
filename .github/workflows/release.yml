@@ -1,7 +1,7 @@
 name: Release
 
 # Manual tag pushes only. Tags created by deploy.yml use the release job there
-# because GITHUB_TOKEN pushes do not trigger other workflows.
+# because GITHUB_TOKEN pushes do not trigger other workflows（公開停止中のため本番デプロイは無い。#214）。
 on:
   push:
     tags:
