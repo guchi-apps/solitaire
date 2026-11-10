@@ -30,7 +30,7 @@ CI（`.github/workflows/ci.yml`）は Node `'20'` で `npm test` → `npm run bu
 ## 本番デプロイ（公開停止中。#214）
 
 **このアプリは公開を停止している。** `main` への push で動く `deploy.yml` は**タグ作成と GitHub Release だけ**で、VPS へは何も送らない。
-`deploy/`・`deploy-retry.yml`・専用デプロイ鍵（`SSH_PRIVATE_KEY`）は撤去済み。サーバー側（公開先・置き場・vhost・authorized_keys・DNS）の撤去は `guchi-apps/vps` の管轄。
+`deploy/`・`deploy-retry.yml`・専用デプロイ鍵（`SSH_PRIVATE_KEY`）は撤去済み。サーバー側（公開先・置き場・vhost・authorized_keys・DNS）の撤去は `guchi-apps/vps` の管轄（追跡: guchi-apps/vps#337、完了確認の手順: `docs/takedown.md`）。撤去が済むまで旧サイトは配信され続ける。
 
 - **デプロイ処理を勝手に復活させない。** 再公開はユーザーの指示があったときだけで、撤去前の `deploy.yml`・`deploy/`・`.github/secrets-manifest.tsv` を #214 より前の履歴から戻す
 - `scripts/write-version-json.js`・`tests/write-version-json.test.js`・`sw.js` の `version.json` 除外は残してある。公開停止中は `version.json` を誰も使わない（再公開時に使う）
