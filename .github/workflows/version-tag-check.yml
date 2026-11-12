@@ -1,7 +1,7 @@
 name: Version tag check
 
 # バージョンを上げ忘れたままdevelop→mainをマージすると、mainへ入った後に deploy.yml の
-# タグ作成が失敗して本番デプロイが止まる。それをmain宛PRのCIで先に落とす（issue-deck#1367）。
+# タグ作成が失敗してタグ・Releaseが作られない。それをmain宛PRのCIで先に落とす（issue-deck#1367）。
 # **本体は issue-deck の reusable-version-tag-check.yml にあり、ここはトリガー定義だけの
 # 薄いcaller**。
 #
